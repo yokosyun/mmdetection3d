@@ -12,7 +12,8 @@ if IS_TORCHSPARSE_AVAILABLE:
     import torchsparse
     import torchsparse.nn.functional as F
     from torchsparse.nn.utils import get_kernel_offsets
-    from torchsparse.tensor import PointTensor, SparseTensor
+    from torchsparse import SparseTensor
+    PointTensor=SparseTensor
 else:
     PointTensor = SparseTensor = None
 

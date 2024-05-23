@@ -2,7 +2,6 @@
 import torch.nn as nn
 from mmengine.registry import MODELS
 
-
 def register_torchsparse() -> bool:
     """This func registers torchsparse modules."""
     try:
@@ -18,8 +17,9 @@ def register_torchsparse() -> bool:
 
             def forward(self, input: SparseTensor) -> SparseTensor:
                 return fapply(input, super().forward)
-
+            
         MODELS._register_module(Conv3d, 'TorchSparseConv3d')
+        MODELS._register_module(BatchNorm, "BN1d", force=True)
         MODELS._register_module(BatchNorm, 'TorchSparseBN')
         MODELS._register_module(SyncBatchNorm, 'TorchSparseSyncBN')
         MODELS._register_module(GroupNorm, 'TorchSparseGN')
