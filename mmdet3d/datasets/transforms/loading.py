@@ -657,8 +657,6 @@ class LoadPointsFromFile(BaseTransform):
         """
         pts_file_path = results['lidar_points']['lidar_path']
         points = self._load_points(pts_file_path)
-        print('------')
-        print(points.shape)
         points = points.reshape(-1, self.load_dim)
         points = points[:, self.use_dim]
         if self.norm_intensity:
