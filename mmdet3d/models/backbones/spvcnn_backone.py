@@ -11,9 +11,9 @@ from .minkunet_backbone import MinkUNetBackbone
 if IS_TORCHSPARSE_AVAILABLE:
     import torchsparse
     import torchsparse.nn.functional as F
-    from torchsparse.nn.utils import get_kernel_offsets
     from torchsparse import SparseTensor
-    PointTensor=SparseTensor
+    from torchsparse.nn.utils import get_kernel_offsets
+    PointTensor = SparseTensor
 else:
     PointTensor = SparseTensor = None
 
