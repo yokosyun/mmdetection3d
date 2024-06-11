@@ -17,6 +17,7 @@ python tools/create_data.py nuscenes --root-path ./data/nuscenes --out-dir ./dat
 ```
 
 for centerpoint
+
 ```
 python tools/create_data.py nuscenes --root-path ./data/nuscenes --out-dir ./data/nuscenes --extra-tag nuscenes --only-gt-database
 ```
@@ -45,11 +46,13 @@ inputs/ckpts/hv_pointpillars_secfpn_6x8_160e_kitti-3d-car_20220331_134606-d42d15
 ## NuScene
 
 train
+
 ```
 python3.8 tools/train.py configs/centerpoint/centerpoint_voxel01_second_secfpn_head-circlenms_8xb4-cyclic-20e_nus-3d.py --amp
 ```
 
 inference
+
 ```
 python3.8 demo/pcd_demo.py \
 demo/data/nuscenes/n015-2018-07-24-11-22-45+0800__LIDAR_TOP__1532402927647951.pcd.bin \
@@ -57,14 +60,17 @@ configs/centerpoint/centerpoint_voxel01_second_secfpn_head-circlenms_8xb4-cyclic
 inputs/ckpts/centerpoint_01voxel_second_secfpn_circlenms_4x8_cyclic_20e_nus_20220810_030004-9061688e.pth \
 --show
 ```
-work_dirs/centerpoint_voxel01_second_secfpn_head-circlenms_8xb4-cyclic-20e_nus-3d/epoch_20.pth \
+
+work_dirs/centerpoint_voxel01_second_secfpn_head-circlenms_8xb4-cyclic-20e_nus-3d/epoch_20.pth \\
 
 browse dataset
+
 ```
 python3.8 tools/misc/browse_dataset.py configs/centerpoint/centerpoint_voxel01_second_secfpn_head-circlenms_8xb4-cyclic-20e_nus-3d.py --task lidar_det --output-dir outputs/
 ```
 
 /home/yoko/anaconda3/envs/openmmlab/lib/python3.8/site-packages/mmcv/cnn/bricks/conv.py
+
 ```
 if layer_type == "TorchSparseConv3d":
     layer = conv_layer(*args, **kwargs)
@@ -73,12 +79,14 @@ else:
 ```
 
 visualize log
+
 ```
  python tools/analysis_tools/analyze_logs.py plot_curve work_dirs/centerpoint_voxel01_second_secfpn_head-circlenms_8xb4
 -cyclic-20e_nus-3d/20240523_184305/vis_data/scalars.json
 ```
 
 loss
+
 ```
 python tools/analysis_tools/analyze_logs.py plot_curve work_dirs/centerpoint_voxel01_second_secfpn_head-circlenms_8xb4-cyclic-20e_nus-3d/20240524_085003/vis_data/20240524_085003.json --keys loss
 plot curve of work_dirs/centerpoint_voxel01_second_secfpn_head-circlenms_8xb4-cyclic-20e_nus-3d/20240524_085003/vis_data/20240524_085003.json, metric is los
