@@ -1,8 +1,9 @@
-import numpy as np
-from typing import Tuple, List, Dict, Any
 import glob
-import open3d as o3d
+from typing import Any, Dict, List, Tuple
+
 import matplotlib.pyplot as plt
+import numpy as np
+import open3d as o3d
 
 NUM_DIMENSIONS = 2
 
@@ -25,14 +26,13 @@ def get_prallel_lines(x_range, y_range, reolution, is_vertical=False):
     return parallel_lines
 
 
-def gen_grid(x_range, y_range, raster_resolution: np.ndarray) -> o3d.geometry.LineSet:
+def gen_grid(x_range, y_range,
+             raster_resolution: np.ndarray) -> o3d.geometry.LineSet:
 
     horizontal_lines = get_prallel_lines(
-        x_range, y_range, raster_resolution[0], is_vertical=False
-    )
+        x_range, y_range, raster_resolution[0], is_vertical=False)
     vertical_lines = get_prallel_lines(
-        y_range, x_range, raster_resolution[1], is_vertical=True
-    )
+        y_range, x_range, raster_resolution[1], is_vertical=True)
 
     line_set = o3d.geometry.LineSet()
     points = np.vstack((vertical_lines, horizontal_lines))
@@ -68,21 +68,22 @@ def sparse_voxelize(
 
     coords = np.floor(points / voxel_resolutions).astype(np.int32)
     _, indices, inverse_indices = np.unique(
-        ravel_hash(coords), return_index=True, return_inverse=True
-    )
+        ravel_hash(coords), return_index=True, return_inverse=True)
     coords = coords[indices]
 
     return coords, indices
 
 
-def visualize_points(points: np.ndarray, x_range, y_range, voxe_resolutions) -> None:
+def visualize_points(points: np.ndarray, x_range, y_range,
+                     voxe_resolutions) -> None:
     if points.shape[1] == 2:
         z = np.zeros(points.shape[0])
         points = np.stack([points[:, 0], points[:, 1], z], axis=1)
 
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(points[:, :3])
-    line_set_grid = gen_grid(x_range, y_range, raster_resolution=voxe_resolutions[:2])
+    line_set_grid = gen_grid(
+        x_range, y_range, raster_resolution=voxe_resolutions[:2])
     o3d.visualization.draw_geometries(
         [pcd, line_set_grid],
         zoom=0.3412,
@@ -108,9 +109,8 @@ def analize_point_clouds(
     voxel_coords, voxel_indices = sparse_voxelize(points, voxel_resolutions)
 
     # Raster
-    raster_coords, raster_indices = sparse_voxelize(
-        points[:, :2], voxel_resolutions[:2]
-    )
+    raster_coords, raster_indices = sparse_voxelize(points[:, :2],
+                                                    voxel_resolutions[:2])
 
     # Count
     num_points = len(points)
@@ -123,26 +123,29 @@ def analize_point_clouds(
     voxel_occupancy_ratio = num_occupied_voxels / np.prod(num_voxels) * 100
     raster_occupany_ratio = num_occupied_raster / np.prod(num_voxels[:2]) * 100
 
-    print(f"num_voxels={num_voxels} [x,y,z]")
-    print(f"voxel_resolutions={voxel_resolutions} [x,y,z]")
-    print(f"num_points={num_points:.0f} [N]")
-    print(f"num_occupied_voxels={num_occupied_voxels:.0f} [N]")
-    print(f"num_occupied_raster={num_occupied_raster:.0f} [N]")
-    print(f"num_voxels={np.prod(num_voxels):.0f} [N]")
-    print(f"num_rasters={np.prod(num_voxels[:2]):.0f} [N]")
+    print(f'num_voxels={num_voxels} [x,y,z]')
+    print(f'voxel_resolutions={voxel_resolutions} [x,y,z]')
+    print(f'num_points={num_points:.0f} [N]')
+    print(f'num_occupied_voxels={num_occupied_voxels:.0f} [N]')
+    print(f'num_occupied_raster={num_occupied_raster:.0f} [N]')
+    print(f'num_voxels={np.prod(num_voxels):.0f} [N]')
+    print(f'num_rasters={np.prod(num_voxels[:2]):.0f} [N]')
 
-    print(f"points_compress_ratio_voxelize={points_compress_ratio_voxelize:.2f} [%]")
-    print(f"points_compress_ratio_raster={points_compress_ratio_raster:.2f} [%]")
+    print(
+        f'points_compress_ratio_voxelize={points_compress_ratio_voxelize:.2f} [%]'
+    )
+    print(
+        f'points_compress_ratio_raster={points_compress_ratio_raster:.2f} [%]')
 
-    print(f"voxel_occupancy_ratio={voxel_occupancy_ratio:.2f} [%]")
-    print(f"raster_occupany_ratio={raster_occupany_ratio:.2f} [%]")
+    print(f'voxel_occupancy_ratio={voxel_occupancy_ratio:.2f} [%]')
+    print(f'raster_occupany_ratio={raster_occupany_ratio:.2f} [%]')
 
-    # Visuaization
+    # Visualization
     if visualize:
         points = points[raster_indices]
         visualize_points(points, x_range, y_range, voxel_resolutions)
 
-    return {"voxel_occupancy_ratio": voxel_occupancy_ratio}
+    return {'voxel_occupancy_ratio': voxel_occupancy_ratio}
 
 
 def main():
@@ -151,12 +154,12 @@ def main():
     #     "demo/data/nuscenes/n015-2018-07-24-11-22-45+0800__LIDAR_TOP__1532402927647951.pcd.bin"
     # ]
 
-    pcd_paths = glob.glob("./data/nuscenes/samples/LIDAR_TOP/*.bin")
+    pcd_paths = glob.glob('./data/nuscenes/samples/LIDAR_TOP/*.bin')
 
     voxel_occupancy_ratio_list = []
 
     for pcd_path in pcd_paths:
-        print("------------------------------------------")
+        print('------------------------------------------')
         print(pcd_path)
         points = np.fromfile(
             pcd_path,
@@ -174,15 +177,11 @@ def main():
             voxel_resolutions = VOXEL_RESOLUTIONS * scale
 
             num_voxels = (
-                np.array(
-                    [
-                        X_RANGE[1] - X_RANGE[0],
-                        Y_RANGE[1] - Y_RANGE[0],
-                        Z_RANGE[1] - Z_RANGE[0],
-                    ]
-                )
-                / voxel_resolutions
-            )
+                np.array([
+                    X_RANGE[1] - X_RANGE[0],
+                    Y_RANGE[1] - Y_RANGE[0],
+                    Z_RANGE[1] - Z_RANGE[0],
+                ]) / voxel_resolutions)
             results = analize_point_clouds(
                 points,
                 num_voxels,
@@ -192,23 +191,24 @@ def main():
                 visualize=False,
             )
 
-            voxel_occupancy_ratio_list.append(results["voxel_occupancy_ratio"])
+            voxel_occupancy_ratio_list.append(results['voxel_occupancy_ratio'])
 
     # Plot Result
     fig = plt.figure()
-    plt.suptitle("voxel_occupancy_ratio histogram in NuScenes", fontsize=16, y=1)
+    plt.suptitle(
+        'voxel_occupancy_ratio histogram in NuScenes', fontsize=16, y=1)
     ax = fig.add_subplot(1, 1, 1)
 
     ax.hist(voxel_occupancy_ratio_list, bins=50)
     ax.set_title(
-        f"X_RANGE={X_RANGE}[m], Y_RANGE={Y_RANGE}[m], Z_RANGE={Z_RANGE}[m], VOXEL_RESOLUTIONS={VOXEL_RESOLUTIONS}[m]",
+        f'X_RANGE={X_RANGE}[m], Y_RANGE={Y_RANGE}[m], Z_RANGE={Z_RANGE}[m], VOXEL_RESOLUTIONS={VOXEL_RESOLUTIONS}[m]',
         fontsize=6,
     )
-    ax.set_xlabel("voxel_occupancy_ratio[%]")
-    ax.set_ylabel("frequency[N]")
-    fig.savefig("hist.jpg")
+    ax.set_xlabel('voxel_occupancy_ratio[%]')
+    ax.set_ylabel('frequency[N]')
+    fig.savefig('hist.jpg')
     fig.show()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
