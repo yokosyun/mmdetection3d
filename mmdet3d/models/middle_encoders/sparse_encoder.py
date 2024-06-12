@@ -124,6 +124,14 @@ class SparseEncoder(nn.Module):
             self.base_channels,
             block_type=block_type)
 
+        if IS_TORCHSPARSE_AVAILABLE:
+            sp_conv_cfg = {'conv_type': 'TorchSparseConv3d'}
+        else:
+            sp_conv_cfg = {
+                'conv_type': 'SparseConv3d',
+                'indice_key': 'spconv_down2'
+            }
+
         self.conv_out = make_sparse_convmodule(
             encoder_out_channels,
             self.output_channels,
@@ -131,9 +139,7 @@ class SparseEncoder(nn.Module):
             stride=(2, 1, 1),
             norm_cfg=norm_cfg,
             padding=0,
-            # indice_key='spconv_down2',
-            # conv_type='SparseConv3d',
-            conv_type='TorchSparseConv3d',
+            **sp_conv_cfg,
         )
 
     @amp.autocast(enabled=False)
@@ -164,7 +170,7 @@ class SparseEncoder(nn.Module):
             sparse_tensor_cfg = {'spatial_range': spatial_range}
         else:
             sparse_tensor_cfg = {
-                'spatial_shape': self.spatial_shape,
+                'spatial_shape': self.sparse_shape,
                 'batch_size': batch_size,
             }
         input_sp_tensor = SparseConvTensor(voxel_features, coors,
