@@ -1,6 +1,7 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import logging
 import os.path as osp
+import time
 from copy import deepcopy
 from typing import Dict, List, Optional, Sequence, Tuple, Union
 
@@ -202,14 +203,26 @@ class Base3DInferencer(BaseInferencer):
 
         cam_type = preprocess_kwargs.pop('cam_type', 'CAM2')
         ori_inputs = self._inputs_to_list(inputs, cam_type=cam_type)
+
+        start_time = time.time()
         inputs = self.preprocess(
             ori_inputs, batch_size=batch_size, **preprocess_kwargs)
+        end_time = time.time()
+        elapsed = (end_time - start_time) * 1000
+        print(f'preproces ={elapsed:.3f}[ms]')
+
         preds = []
 
         results_dict = {'predictions': [], 'visualization': []}
         for data in (track(inputs, description='Inference')
                      if self.show_progress else inputs):
+
+            start_time = time.time()
             preds.extend(self.forward(data, **forward_kwargs))
+            end_time = time.time()
+            elapsed = (end_time - start_time) * 1000
+            print(f'forward ={elapsed:.3f}[ms]')
+
             visualization = self.visualize(ori_inputs, preds,
                                            **visualize_kwargs)
             results = self.postprocess(preds, visualization,

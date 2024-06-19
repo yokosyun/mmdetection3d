@@ -1,4 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import time
 from typing import Dict, List, Optional, Tuple, Union
 
 import torch
@@ -139,20 +140,37 @@ class SparseEncoder(nn.Module):
                 output features. When self.return_middle_feats is True, the
                 module returns middle features.
         """
+        start_time = time.time()
         coors = coors.int()
         input_sp_tensor = SparseConvTensor(voxel_features, coors,
                                            self.sparse_shape, batch_size)
         x = self.conv_input(input_sp_tensor)
+        end_time = time.time()
+        elapsed = (end_time - start_time) * 1000
+        print(f'SparseEncoder:SparseConvTensor ={elapsed:.3f}[ms]')
 
+        start_time = time.time()
         encode_features = []
         for encoder_layer in self.encoder_layers:
             x = encoder_layer(x)
             encode_features.append(x)
+        end_time = time.time()
+        elapsed = (end_time - start_time) * 1000
+        print(f'SparseEncoder:encode ={elapsed:.3f}[ms]')
 
         # for detection head
         # [200, 176, 5] -> [200, 176, 2]
+        start_time = time.time()
         out = self.conv_out(encode_features[-1])
+        end_time = time.time()
+        elapsed = (end_time - start_time) * 1000
+        print(f'SparseEncoder:convout ={elapsed:.3f}[ms]')
+
+        start_time = time.time()
         spatial_features = out.dense()
+        end_time = time.time()
+        elapsed = (end_time - start_time) * 1000
+        print(f'SparseEncoder:dense ={elapsed:.3f}[ms]')
 
         N, C, D, H, W = spatial_features.shape
         spatial_features = spatial_features.view(N, C * D, H, W)

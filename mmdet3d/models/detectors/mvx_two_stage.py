@@ -1,5 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import copy
+import time
 from typing import Dict, List, Optional, Sequence
 
 import torch
@@ -206,16 +207,37 @@ class MVXTwoStageDetector(Base3DDetector):
         """
         if not self.with_pts_bbox:
             return None
+
+        start_time = time.time()
         voxel_features = self.pts_voxel_encoder(voxel_dict['voxels'],
                                                 voxel_dict['num_points'],
                                                 voxel_dict['coors'], img_feats,
                                                 batch_input_metas)
+        end_time = time.time()
+        elapsed = (end_time - start_time) * 1000
+        print(f'pts_voxel_encoder ={elapsed:.3f}[ms]')
+
         batch_size = voxel_dict['coors'][-1, 0] + 1
+
+        start_time = time.time()
         x = self.pts_middle_encoder(voxel_features, voxel_dict['coors'],
                                     batch_size)
+        end_time = time.time()
+        elapsed = (end_time - start_time) * 1000
+        print(f'pts_middle_encoder ={elapsed:.3f}[ms]')
+
+        start_time = time.time()
         x = self.pts_backbone(x)
+        end_time = time.time()
+        elapsed = (end_time - start_time) * 1000
+        print(f'pts_backbone ={elapsed:.3f}[ms]')
+
+        start_time = time.time()
         if self.with_pts_neck:
             x = self.pts_neck(x)
+        end_time = time.time()
+        elapsed = (end_time - start_time) * 1000
+        print(f'pts_neck ={elapsed:.3f}[ms]')
         return x
 
     def extract_feat(self, batch_inputs_dict: dict,
@@ -386,13 +408,23 @@ class MVXTwoStageDetector(Base3DDetector):
                 contains a tensor with shape (num_instances, 7).
         """
         batch_input_metas = [item.metainfo for item in batch_data_samples]
+        start_time = time.time()
         img_feats, pts_feats = self.extract_feat(batch_inputs_dict,
                                                  batch_input_metas)
+        end_time = time.time()
+        elapsed = (end_time - start_time) * 1000
+        print(f'extract_feat ={elapsed:.3f}[ms]')
+
+        start_time = time.time()
         if pts_feats and self.with_pts_bbox:
             results_list_3d = self.pts_bbox_head.predict(
                 pts_feats, batch_data_samples, **kwargs)
         else:
             results_list_3d = None
+
+        end_time = time.time()
+        elapsed = (end_time - start_time) * 1000
+        print(f'predict ={elapsed:.3f}[ms]')
 
         if img_feats and self.with_img_bbox:
             # TODO check this for camera modality
