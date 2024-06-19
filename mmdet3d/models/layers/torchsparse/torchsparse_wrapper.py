@@ -20,7 +20,7 @@ def register_torchsparse() -> bool:
                 return fapply(input, super().forward)
 
         MODELS._register_module(Conv3d, 'TorchSparseConv3d')
-        MODELS._register_module(BatchNorm, 'BN1d', force=True)
+        # MODELS._register_module(BatchNorm, 'BN1d', force=True)
         MODELS._register_module(BatchNorm, 'TorchSparseBN')
         MODELS._register_module(SyncBatchNorm, 'TorchSparseSyncBN')
         MODELS._register_module(GroupNorm, 'TorchSparseGN')

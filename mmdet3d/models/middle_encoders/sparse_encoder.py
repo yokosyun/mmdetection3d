@@ -89,16 +89,15 @@ class SparseEncoder(nn.Module):
         assert isinstance(order, tuple) and len(order) == 3
         assert set(order) == {'conv', 'norm', 'act'}
 
-        if IS_TORCHSPARSE_AVAILABLE:
-            sp_conv_cfg = {'conv_type': 'TorchSparseConv3d'}
-        else:
-            sp_conv_cfg = {
-                'conv_type': 'SubMConv3d',
-                'indice_key': 'subm1',
-                'order': ('conv', )
-            }
-
         if self.order[0] != 'conv':  # pre activate
+            if IS_TORCHSPARSE_AVAILABLE:
+                sp_conv_cfg = {'conv_type': 'TorchSparseConv3d'}
+            else:
+                sp_conv_cfg = {
+                    'conv_type': 'SubMConv3d',
+                    'indice_key': 'subm1',
+                    'order': ('conv', )
+                }
             self.conv_input = make_sparse_convmodule(
                 in_channels,
                 self.base_channels,
@@ -109,6 +108,13 @@ class SparseEncoder(nn.Module):
                 **sp_conv_cfg,
             )
         else:  # post activate
+            if IS_TORCHSPARSE_AVAILABLE:
+                sp_conv_cfg = {'conv_type': 'TorchSparseConv3d'}
+            else:
+                sp_conv_cfg = {
+                    'conv_type': 'SubMConv3d',
+                    'indice_key': 'subm1',
+                }
             self.conv_input = make_sparse_convmodule(
                 in_channels,
                 self.base_channels,
