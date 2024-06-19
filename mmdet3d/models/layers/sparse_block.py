@@ -1,6 +1,7 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from typing import Optional, Tuple, Union
 
+import torchsparse.nn as spnn
 from mmcv.cnn import build_conv_layer, build_norm_layer
 from mmdet.models.backbones.resnet import BasicBlock, Bottleneck
 from torch import nn
@@ -218,7 +219,10 @@ def make_sparse_convmodule(in_channels: int,
         elif layer == 'norm':
             layers.append(build_norm_layer(norm_cfg, out_channels)[1])
         elif layer == 'act':
-            layers.append(nn.ReLU(inplace=True))
+            if conv_cfg['type'] == 'TorchSparseConv3d':
+                layers.append(spnn.ReLU(inplace=True))
+            else:
+                layers.append(nn.ReLU(inplace=True))
 
     layers = SparseSequential(*layers)
     return layers
