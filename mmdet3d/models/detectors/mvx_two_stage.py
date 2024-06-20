@@ -407,13 +407,18 @@ class MVXTwoStageDetector(Base3DDetector):
             - bbox_3d (:obj:`BaseInstance3DBoxes`): Prediction of bboxes,
                 contains a tensor with shape (num_instances, 7).
         """
+        start_time = time.time()
         batch_input_metas = [item.metainfo for item in batch_data_samples]
+        end_time = time.time()
+        elapsed = (end_time - start_time) * 1000
+        print(f'MVXTwoStageDetector:for ={elapsed:.3f}[ms]')
+
         start_time = time.time()
         img_feats, pts_feats = self.extract_feat(batch_inputs_dict,
                                                  batch_input_metas)
         end_time = time.time()
         elapsed = (end_time - start_time) * 1000
-        print(f'extract_feat ={elapsed:.3f}[ms]')
+        print(f'MVXTwoStageDetector:extract_feat ={elapsed:.3f}[ms]')
 
         start_time = time.time()
         if pts_feats and self.with_pts_bbox:
@@ -424,8 +429,9 @@ class MVXTwoStageDetector(Base3DDetector):
 
         end_time = time.time()
         elapsed = (end_time - start_time) * 1000
-        print(f'predict ={elapsed:.3f}[ms]')
+        print(f'MVXTwoStageDetector:predict ={elapsed:.3f}[ms]')
 
+        start_time = time.time()
         if img_feats and self.with_img_bbox:
             # TODO check this for camera modality
             results_list_2d = self.predict_imgs(img_feats, batch_data_samples,
@@ -436,4 +442,9 @@ class MVXTwoStageDetector(Base3DDetector):
         detsamples = self.add_pred_to_datasample(batch_data_samples,
                                                  results_list_3d,
                                                  results_list_2d)
+
+        end_time = time.time()
+        elapsed = (end_time - start_time) * 1000
+        print(f'MVXTwoStageDetector:add_pred ={elapsed:.3f}[ms]')
+
         return detsamples

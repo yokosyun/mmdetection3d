@@ -217,11 +217,14 @@ class Base3DInferencer(BaseInferencer):
         for data in (track(inputs, description='Inference')
                      if self.show_progress else inputs):
 
-            start_time = time.time()
-            preds.extend(self.forward(data, **forward_kwargs))
-            end_time = time.time()
-            elapsed = (end_time - start_time) * 1000
-            print(f'forward ={elapsed:.3f}[ms]')
+            for iter in range(10):
+                print('--------------------------------', iter)
+                start_time = time.time()
+                y = self.forward(data, **forward_kwargs)
+                end_time = time.time()
+                elapsed = (end_time - start_time) * 1000
+                print(f'forward ={elapsed:.3f}[ms]')
+                preds.extend(y)
 
             visualization = self.visualize(ori_inputs, preds,
                                            **visualize_kwargs)

@@ -142,12 +142,22 @@ class SparseEncoder(nn.Module):
         """
         start_time = time.time()
         coors = coors.int()
+        end_time = time.time()
+        elapsed = (end_time - start_time) * 1000
+        print(f'SparseEncoder:int ={elapsed:.3f}[ms]')
+
+        start_time = time.time()
         input_sp_tensor = SparseConvTensor(voxel_features, coors,
                                            self.sparse_shape, batch_size)
-        x = self.conv_input(input_sp_tensor)
         end_time = time.time()
         elapsed = (end_time - start_time) * 1000
         print(f'SparseEncoder:SparseConvTensor ={elapsed:.3f}[ms]')
+
+        start_time = time.time()
+        x = self.conv_input(input_sp_tensor)
+        end_time = time.time()
+        elapsed = (end_time - start_time) * 1000
+        print(f'SparseEncoder:conv_input ={elapsed:.3f}[ms]')
 
         start_time = time.time()
         encode_features = []
