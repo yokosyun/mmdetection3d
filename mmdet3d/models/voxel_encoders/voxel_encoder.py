@@ -39,8 +39,15 @@ class HardSimpleVFE(nn.Module):
         Returns:
             torch.Tensor: Mean of points inside each voxel in shape (N, 3(4))
         """
-        points_mean = features[:, :, :self.num_features].sum(
-            dim=1, keepdim=False) / num_points.type_as(features).view(-1, 1)
+        if False:
+            points_mean = features[:, :, :self.num_features].sum(
+                dim=1, keepdim=False) / num_points.type_as(features).view(
+                    -1, 1)
+            num_points, _ = points_mean.shape
+            # rand_x = torch.rand(num_points, device="cuda") * 10
+            # points_mean[:, 0] -= rand_x
+        else:
+            points_mean = features[:, 0, :self.num_features]
         return points_mean.contiguous()
 
 
