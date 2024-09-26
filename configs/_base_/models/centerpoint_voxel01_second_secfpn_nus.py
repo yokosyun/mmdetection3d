@@ -1,3 +1,5 @@
+checkpoint_config = dict(interval=1)
+score_scale = 1.0
 voxel_size = [0.1, 0.1, 0.2]
 model = dict(
     type='CenterPoint',
@@ -53,7 +55,7 @@ model = dict(
             type='CenterPointBBoxCoder',
             post_center_range=[-61.2, -61.2, -10.0, 61.2, 61.2, 10.0],
             max_num=500,
-            score_threshold=0.1,
+            score_threshold=0.1 * score_scale,
             out_size_factor=8,
             voxel_size=voxel_size[:2],
             code_size=9),
@@ -80,10 +82,10 @@ model = dict(
             max_per_img=500,
             max_pool_nms=False,
             min_radius=[4, 12, 10, 1, 0.85, 0.175],
-            score_threshold=0.1,
+            score_threshold=0.1 * score_scale,
             out_size_factor=8,
             voxel_size=voxel_size[:2],
             nms_type='rotate',
             pre_max_size=1000,
             post_max_size=83,
-            nms_thr=0.2)))
+            nms_thr=0.2 * score_scale)))

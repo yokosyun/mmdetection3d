@@ -8,7 +8,7 @@ lr = 1e-4
 # max_norm=10 is better for SECOND
 optim_wrapper = dict(
     type='OptimWrapper',
-    optimizer=dict(type='AdamW', lr=lr, weight_decay=0.01),
+    optimizer=dict(type='AdamW', lr=lr, weight_decay=0.01,eps=1.0e-4),
     clip_grad=dict(max_norm=35, norm_type=2))
 # learning rate
 param_scheduler = [
