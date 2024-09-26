@@ -4,6 +4,12 @@
 export PYTHONPATH=${PYTHONPATH}:"/home/yoko/dev/mmdetection3d"
 pip install typing-extensions --upgrade
 mim install mmcv=='2.2.0'
+pip install -v -e .
+```
+
+```
+cd mmcv
+pip install -v -e .
 ```
 
 # Data Conversion
@@ -51,6 +57,10 @@ train
 python3.8 tools/train.py configs/centerpoint/centerpoint_voxel01_second_secfpn_head-circlenms_8xb4-cyclic-20e_nus-3d.py --amp
 ```
 
+```
+python3.8 tools/train.py configs/centerpoint/centerpoint_pillar02_second_secfpn_8xb4-cyclic-20e_nus-3d.py --amp
+```
+
 inference
 
 ```
@@ -58,6 +68,14 @@ python3.8 demo/pcd_demo.py \
 demo/data/nuscenes/n015-2018-07-24-11-22-45+0800__LIDAR_TOP__1532402927647951.pcd.bin \
 configs/centerpoint/centerpoint_voxel01_second_secfpn_head-circlenms_8xb4-cyclic-20e_nus-3d.py \
 inputs/ckpts/centerpoint_01voxel_second_secfpn_circlenms_4x8_cyclic_20e_nus_20220810_030004-9061688e.pth \
+--show
+```
+
+```
+python3.8 demo/pcd_demo.py \
+demo/data/nuscenes/n015-2018-07-24-11-22-45+0800__LIDAR_TOP__1532402927647951.pcd.bin \
+configs/centerpoint/centerpoint_pillar02_second_secfpn_8xb4-cyclic-20e_nus-3d.py \
+inputs/ckpts/centerpoint_02pillar_second_secfpn_circlenms_4x8_cyclic_20e_nus_20220811_031844-191a3822.pth \
 --show
 ```
 
