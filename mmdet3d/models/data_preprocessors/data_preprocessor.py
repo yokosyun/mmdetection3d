@@ -86,7 +86,7 @@ class Det3DDataPreprocessor(DetDataPreprocessor):
 
     def __init__(self,
                  voxel: bool = False,
-                 voxel_type: str = 'quantize',
+                 voxel_type: str = 'hard',
                  voxel_layer: OptConfigType = None,
                  batch_first: bool = True,
                  max_voxels: Optional[int] = None,
