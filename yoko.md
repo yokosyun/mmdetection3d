@@ -63,6 +63,10 @@ python3.8 tools/train.py configs/centerpoint/centerpoint_voxel01_second_secfpn_h
 python3.8 tools/train.py configs/centerpoint/centerpoint_pillar02_second_secfpn_8xb4-cyclic-20e_nus-3d.py --amp
 ```
 
+```
+python3.8 tools/train.py configs/centerpoint/centerpoint_pillar02_second_secfpn_8xb4-cyclic-20e_nus-3d_flatformer.py --amp
+```
+
 ### inference
 
 ```
@@ -76,8 +80,8 @@ inputs/ckpts/centerpoint_01voxel_second_secfpn_circlenms_4x8_cyclic_20e_nus_2022
 ```
 python3.8 demo/pcd_demo.py \
 demo/data/nuscenes/n015-2018-07-24-11-22-45+0800__LIDAR_TOP__1532402927647951.pcd.bin \
-configs/centerpoint/centerpoint_pillar02_second_secfpn_8xb4-cyclic-20e_nus-3d.py \
-inputs/ckpts/centerpoint_02pillar_second_secfpn_circlenms_4x8_cyclic_20e_nus_20220811_031844-191a3822.pth \
+configs/centerpoint/centerpoint_pillar02_second_secfpn_8xb4-cyclic-20e_nus-3d_flatformer.py \
+inputs/ckpts/centerpoint_pillar02_second_secfpn_8xb4-cyclic-20e_nus-3d_flatformer_epoch_20.pth \
 --show
 ```
 
@@ -85,8 +89,8 @@ inputs/ckpts/centerpoint_02pillar_second_secfpn_circlenms_4x8_cyclic_20e_nus_202
 
 ```
 python3.8 tools/test.py \
-configs/centerpoint/centerpoint_pillar02_second_secfpn_8xb4-cyclic-20e_nus-3d.py \
-work_dirs/centerpoint_pillar02_second_secfpn_8xb4-cyclic-20e_nus-3d/epoch_20.pth
+configs/centerpoint/centerpoint_pillar02_second_secfpn_8xb4-cyclic-20e_nus-3d_flatformer.py \
+inputs/ckpts/centerpoint_pillar02_second_secfpn_8xb4-cyclic-20e_nus-3d_flatformer_epoch_20.pth
 ```
 
 work_dirs/centerpoint_voxel01_second_secfpn_head-circlenms_8xb4-cyclic-20e_nus-3d/epoch_20.pth \\
