@@ -11,6 +11,19 @@ from .utils import VFELayer, get_paddings_indicator
 
 
 @MODELS.register_module()
+class SkipVFE(nn.Module):
+    """Do nothing."""
+
+    def __init__(self, num_features: int = None) -> None:
+        super(SkipVFE, self).__init__()
+
+    def forward(self, features: Tensor, num_points: Tensor, coors: Tensor,
+                *args, **kwargs) -> Tensor:
+
+        return features
+
+
+@MODELS.register_module()
 class HardSimpleVFE(nn.Module):
     """Simple voxel feature encoder used in SECOND.
 

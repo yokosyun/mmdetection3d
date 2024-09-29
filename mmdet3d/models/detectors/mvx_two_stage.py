@@ -206,10 +206,9 @@ class MVXTwoStageDetector(Base3DDetector):
         """
         if not self.with_pts_bbox:
             return None
-        voxel_features = self.pts_voxel_encoder(voxel_dict['voxels'],
-                                                voxel_dict['num_points'],
-                                                voxel_dict['coors'], img_feats,
-                                                batch_input_metas)
+        voxel_features = self.pts_voxel_encoder(
+            voxel_dict['voxels'], voxel_dict.get('num_points', None),
+            voxel_dict['coors'], img_feats, batch_input_metas)
         batch_size = voxel_dict['coors'][-1, 0] + 1
         x = self.pts_middle_encoder(voxel_features, voxel_dict['coors'],
                                     batch_size)
