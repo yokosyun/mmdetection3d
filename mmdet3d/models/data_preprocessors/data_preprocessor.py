@@ -366,7 +366,6 @@ class Det3DDataPreprocessor(DetDataPreprocessor):
             voxels, coors, num_points, voxel_centers = [], [], [], []
             for i, res in enumerate(points):
                 res_voxels, res_coors, res_num_points = self.voxel_layer(res)
-
                 res_voxel_centers = (
                     res_coors[:, [2, 1, 0]] + 0.5) * res_voxels.new_tensor(
                         self.voxel_layer.voxel_size) + res_voxels.new_tensor(
