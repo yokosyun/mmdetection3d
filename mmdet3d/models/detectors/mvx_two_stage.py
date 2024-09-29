@@ -209,17 +209,9 @@ class MVXTwoStageDetector(Base3DDetector):
             return None
 
         start_time = time.time()
-        if voxel_dict['voxels'].dim() == 3:
-            voxel_features = self.pts_voxel_encoder(voxel_dict['voxels'],
-                                                    voxel_dict['num_points'],
-                                                    voxel_dict['coors'],
-                                                    img_feats,
-                                                    batch_input_metas)
-        elif voxel_dict['voxels'].dim() == 2:
-            voxel_features = voxel_dict['voxels'].contiguous()
-        else:
-            assert False, 'dim must be 2 or 3'
-
+        voxel_features = self.pts_voxel_encoder(
+            voxel_dict['voxels'], voxel_dict.get('num_points', None),
+            voxel_dict['coors'], img_feats, batch_input_metas)
         end_time = time.time()
         elapsed = (end_time - start_time) * 1000
         print(f'pts_voxel_encoder ={elapsed:.3f}[ms]')

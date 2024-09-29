@@ -615,3 +615,53 @@ def ravel_hash(x: np.ndarray) -> np.ndarray:
     else:
         h = x[:, 0] + xmax[0] * (x[:, 1] + x[:, 2] * xmax[1])
         return h
+
+
+def sparse_quantize(
+    points: torch.Tensor,
+    voxel_size: Union[float, Tuple[float, ...]],
+    min_range,
+    dim=0,
+) -> List[np.ndarray]:
+    # if isinstance(voxel_size, (float, int)):
+    #     voxel_size = tuple(repeat(voxel_size, 3))
+    # assert isinstance(voxel_size, tuple) and len(voxel_size) == 3
+
+    voxel_size = torch.tensor(voxel_size, device=points.device)
+    coords = points[:, :3].clone()
+    min_range = torch.tensor(min_range[:3], device=points.device)
+    coords -= min_range
+    coords = torch.floor(coords / voxel_size).to(torch.int32)
+
+    unique, inverse_indices = torch.unique(
+        ravel_hash(coords), return_inverse=True)
+
+    perm = torch.arange(
+        inverse_indices.size(dim),
+        dtype=inverse_indices.dtype,
+        device=inverse_indices.device)
+    inverse_indices, perm = inverse_indices.flip([dim]), perm.flip([dim])
+    indices = inverse_indices.new_empty(unique.size(dim)).scatter_(
+        dim, inverse_indices, perm)
+
+    unique_coords = coords[indices]
+    return unique_coords, indices
+
+
+def ravel_hash(x: np.ndarray) -> np.ndarray:
+    # assert x.ndim == 2, x.shape
+
+    x = x - torch.amin(x, axis=0)
+    x = x.to(torch.int32)
+    xmax = torch.amax(x, axis=0).to(torch.int32) + 1
+
+    h = torch.zeros(x.shape[0], dtype=torch.int32, device=x.device)
+    if True:
+        for k in range(x.shape[1] - 1):
+            h += x[:, k]
+            h *= xmax[k + 1]
+        h += x[:, -1]
+        return h
+    else:
+        h = x[:, 0] + xmax[0] * (x[:, 1] + x[:, 2] * xmax[1])
+        return h
