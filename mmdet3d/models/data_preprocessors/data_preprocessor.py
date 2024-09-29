@@ -370,13 +370,7 @@ class Det3DDataPreprocessor(DetDataPreprocessor):
         if self.voxel_type == 'hard':
             voxels, coors, num_points, voxel_centers = [], [], [], []
             for i, res in enumerate(points):
-                start_time = time.time()
                 res_voxels, res_coors, res_num_points = self.voxel_layer(res)
-                end_time = time.time()
-                elapsed = (end_time - start_time) * 1000
-                print(f'Det3DDataPreprocessor:voxel_layer ={elapsed:.3f}[ms]')
-
-                start_time = time.time()
                 res_voxel_centers = (
                     res_coors[:, [2, 1, 0]] + 0.5) * res_voxels.new_tensor(
                         self.voxel_layer.voxel_size) + res_voxels.new_tensor(
@@ -386,9 +380,6 @@ class Det3DDataPreprocessor(DetDataPreprocessor):
                 coors.append(res_coors)
                 num_points.append(res_num_points)
                 voxel_centers.append(res_voxel_centers)
-                end_time = time.time()
-                elapsed = (end_time - start_time) * 1000
-                print(f'Det3DDataPreprocessor:post ={elapsed:.3f}[ms]')
 
             voxels = torch.cat(voxels, dim=0)
             coors = torch.cat(coors, dim=0)
