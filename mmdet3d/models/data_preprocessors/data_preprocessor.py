@@ -149,7 +149,8 @@ class Det3DDataPreprocessor(DetDataPreprocessor):
             return aug_batch_data
 
         else:
-            return self.simple_process(data, training)
+            y = self.simple_process(data, training)
+            return y
 
     def simple_process(self, data: dict, training: bool = False) -> dict:
         """Perform normalization, padding and bgr2rgb conversion for img data
@@ -365,6 +366,7 @@ class Det3DDataPreprocessor(DetDataPreprocessor):
             voxels, coors, num_points, voxel_centers = [], [], [], []
             for i, res in enumerate(points):
                 res_voxels, res_coors, res_num_points = self.voxel_layer(res)
+
                 res_voxel_centers = (
                     res_coors[:, [2, 1, 0]] + 0.5) * res_voxels.new_tensor(
                         self.voxel_layer.voxel_size) + res_voxels.new_tensor(
@@ -458,7 +460,17 @@ class Det3DDataPreprocessor(DetDataPreprocessor):
                 coors.append(res_voxel_coors)
             voxels = torch.cat(voxels, dim=0)
             coors = torch.cat(coors, dim=0)
+        elif self.voxel_type == 'quantize':
+            for i, res in enumerate(points):
+                points = res
 
+                coors, indices = sparse_quantize(
+                    points, self.voxel_layer.voxel_size,
+                    self.voxel_layer.point_cloud_range)
+                voxels = points[indices]
+                time_index = torch.zeros_like(indices) + i
+                coors = torch.cat([time_index[:, None], coors[:, [2, 1, 0]]],
+                                  dim=1)
         else:
             raise ValueError(f'Invalid voxelization type {self.voxel_type}')
 
@@ -540,3 +552,53 @@ class Det3DDataPreprocessor(DetDataPreprocessor):
         if return_inverse:
             outputs += [inverse_indices]
         return outputs
+
+
+def sparse_quantize(
+    points: torch.Tensor,
+    voxel_size: Union[float, Tuple[float, ...]],
+    min_range,
+    dim=0,
+) -> List[np.ndarray]:
+    # if isinstance(voxel_size, (float, int)):
+    #     voxel_size = tuple(repeat(voxel_size, 3))
+    # assert isinstance(voxel_size, tuple) and len(voxel_size) == 3
+
+    voxel_size = torch.tensor(voxel_size, device=points.device)
+    coords = points[:, :3].clone()
+    min_range = torch.tensor(min_range[:3], device=points.device)
+    coords -= min_range
+    coords = torch.floor(coords / voxel_size).to(torch.int32)
+
+    unique, inverse_indices = torch.unique(
+        ravel_hash(coords), return_inverse=True)
+
+    perm = torch.arange(
+        inverse_indices.size(dim),
+        dtype=inverse_indices.dtype,
+        device=inverse_indices.device)
+    inverse_indices, perm = inverse_indices.flip([dim]), perm.flip([dim])
+    indices = inverse_indices.new_empty(unique.size(dim)).scatter_(
+        dim, inverse_indices, perm)
+
+    unique_coords = coords[indices]
+    return unique_coords, indices
+
+
+def ravel_hash(x: np.ndarray) -> np.ndarray:
+    # assert x.ndim == 2, x.shape
+
+    x = x - torch.amin(x, axis=0)
+    x = x.to(torch.int32)
+    xmax = torch.amax(x, axis=0).to(torch.int32) + 1
+
+    h = torch.zeros(x.shape[0], dtype=torch.int32, device=x.device)
+    if True:
+        for k in range(x.shape[1] - 1):
+            h += x[:, k]
+            h *= xmax[k + 1]
+        h += x[:, -1]
+        return h
+    else:
+        h = x[:, 0] + xmax[0] * (x[:, 1] + x[:, 2] * xmax[1])
+        return h
