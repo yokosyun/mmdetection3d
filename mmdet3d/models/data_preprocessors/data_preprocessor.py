@@ -384,13 +384,18 @@ class Det3DDataPreprocessor(DetDataPreprocessor):
             voxel_dict['num_points'] = num_points
             voxel_dict['voxel_centers'] = voxel_centers
         elif self.voxel_type == 'dynamic':
+            # NOTE(yoko) modified to ignore out of ROI
             coors = []
+            voxels = []
             # dynamic voxelization only provide a coors mapping
             for i, res in enumerate(points):
                 res_coors = self.voxel_layer(res)
+                within_roi = ~torch.any(res_coors == -1, dim=1)
+                res_coors = res_coors[within_roi]
                 res_coors = F.pad(res_coors, (1, 0), mode='constant', value=i)
                 coors.append(res_coors)
-            voxels = torch.cat(points, dim=0)
+                voxels.append(res[within_roi])
+            voxels = torch.cat(voxels, dim=0)
             coors = torch.cat(coors, dim=0)
         elif self.voxel_type == 'cylindrical':
             voxels, coors = [], []
