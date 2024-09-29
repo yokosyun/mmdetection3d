@@ -1,5 +1,4 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-import time
 from typing import Any, List, Optional, Tuple, Union
 
 import torch
@@ -70,18 +69,12 @@ class _Voxelization(Function):
                 NDim=3)
             return coors
         else:
-            start_time = time.time()
             voxels = points.new_zeros(
                 size=(max_voxels, max_points, points.size(1)))
             coors = points.new_zeros(size=(max_voxels, 3), dtype=torch.int)
             num_points_per_voxel = points.new_zeros(
                 size=(max_voxels, ), dtype=torch.int)
             voxel_num = torch.zeros(size=(), dtype=torch.long)
-            end_time = time.time()
-            elapsed = (end_time - start_time) * 1000
-            print(f'_Voxelization:zeros ={elapsed:.3f}[ms]')
-
-            start_time = time.time()
             ext_module.hard_voxelize_forward(
                 points,
                 torch.tensor(voxel_size, dtype=torch.float),
@@ -94,18 +87,10 @@ class _Voxelization(Function):
                 max_voxels=max_voxels,
                 NDim=3,
                 deterministic=deterministic)
-            end_time = time.time()
-            elapsed = (end_time - start_time) * 1000
-            print(f'_Voxelization:hard_voxelize_forward ={elapsed:.3f}[ms]')
-
-            start_time = time.time()
             # select the valid voxels
             voxels_out = voxels[:voxel_num]
             coors_out = coors[:voxel_num]
             num_points_per_voxel_out = num_points_per_voxel[:voxel_num]
-            end_time = time.time()
-            elapsed = (end_time - start_time) * 1000
-            print(f'_Voxelization:mask ={elapsed:.3f}[ms]')
             return voxels_out, coors_out, num_points_per_voxel_out
 
 
