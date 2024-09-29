@@ -15,7 +15,9 @@ pip install -v -e .
 # Data Conversion
 
 ```
+unlink data/nuscenes
 ln -s  /media/yoko/SSD-PGU3/workspace/datasets/nuscenes/v1.0-mini data/nuscenes
+ln -s  /media/yoko/SSD-PGU3/workspace/datasets/nuscenes/v1.0-full data/nuscenes
 ```
 
 ```
@@ -51,7 +53,7 @@ inputs/ckpts/hv_pointpillars_secfpn_6x8_160e_kitti-3d-car_20220331_134606-d42d15
 
 ## NuScene
 
-train
+### train
 
 ```
 python3.8 tools/train.py configs/centerpoint/centerpoint_voxel01_second_secfpn_head-circlenms_8xb4-cyclic-20e_nus-3d.py --amp
@@ -61,7 +63,7 @@ python3.8 tools/train.py configs/centerpoint/centerpoint_voxel01_second_secfpn_h
 python3.8 tools/train.py configs/centerpoint/centerpoint_pillar02_second_secfpn_8xb4-cyclic-20e_nus-3d.py --amp
 ```
 
-inference
+### inference
 
 ```
 python3.8 demo/pcd_demo.py \
@@ -77,6 +79,14 @@ demo/data/nuscenes/n015-2018-07-24-11-22-45+0800__LIDAR_TOP__1532402927647951.pc
 configs/centerpoint/centerpoint_pillar02_second_secfpn_8xb4-cyclic-20e_nus-3d.py \
 inputs/ckpts/centerpoint_02pillar_second_secfpn_circlenms_4x8_cyclic_20e_nus_20220811_031844-191a3822.pth \
 --show
+```
+
+### Test
+
+```
+python3.8 tools/test.py \
+configs/centerpoint/centerpoint_pillar02_second_secfpn_8xb4-cyclic-20e_nus-3d.py \
+work_dirs/centerpoint_pillar02_second_secfpn_8xb4-cyclic-20e_nus-3d/epoch_20.pth
 ```
 
 work_dirs/centerpoint_voxel01_second_secfpn_head-circlenms_8xb4-cyclic-20e_nus-3d/epoch_20.pth \\
@@ -109,3 +119,7 @@ loss
 python tools/analysis_tools/analyze_logs.py plot_curve work_dirs/centerpoint_voxel01_second_secfpn_head-circlenms_8xb4-cyclic-20e_nus-3d/20240524_085003/vis_data/20240524_085003.json --keys loss
 plot curve of work_dirs/centerpoint_voxel01_second_secfpn_head-circlenms_8xb4-cyclic-20e_nus-3d/20240524_085003/vis_data/20240524_085003.json, metric is los
 ```
+
+# Reference
+
+[centerpoint++](https://cvpr2021.wad.vision/)
