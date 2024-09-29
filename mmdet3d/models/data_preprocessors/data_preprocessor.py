@@ -516,56 +516,6 @@ class Det3DDataPreprocessor(DetDataPreprocessor):
                                                        res_coors, 'mean', True)
             data_sample.point2voxel_map = point2voxel_map
 
-    def ravel_hash(self, x: np.ndarray) -> np.ndarray:
-        """Get voxel coordinates hash for np.unique.
-
-        Args:
-            x (np.ndarray): The voxel coordinates of points, Nx3.
-
-        Returns:
-            np.ndarray: Voxels coordinates hash.
-        """
-        assert x.ndim == 2, x.shape
-
-        x = x - np.min(x, axis=0)
-        x = x.astype(np.uint64, copy=False)
-        xmax = np.max(x, axis=0).astype(np.uint64) + 1
-
-        h = np.zeros(x.shape[0], dtype=np.uint64)
-        for k in range(x.shape[1] - 1):
-            h += x[:, k]
-            h *= xmax[k + 1]
-        h += x[:, -1]
-        return h
-
-    def sparse_quantize(self,
-                        coords: np.ndarray,
-                        return_index: bool = False,
-                        return_inverse: bool = False) -> List[np.ndarray]:
-        """Sparse Quantization for voxel coordinates used in Minkunet.
-
-        Args:
-            coords (np.ndarray): The voxel coordinates of points, Nx3.
-            return_index (bool): Whether to return the indices of the unique
-                coords, shape (M,).
-            return_inverse (bool): Whether to return the indices of the
-                original coords, shape (N,).
-
-        Returns:
-            List[np.ndarray]: Return index and inverse map if return_index and
-            return_inverse is True.
-        """
-        _, indices, inverse_indices = np.unique(
-            self.ravel_hash(coords), return_index=True, return_inverse=True)
-        coords = coords[indices]
-
-        outputs = []
-        if return_index:
-            outputs += [indices]
-        if return_inverse:
-            outputs += [inverse_indices]
-        return outputs
-
 
 def sparse_quantize(
     points: torch.Tensor,
