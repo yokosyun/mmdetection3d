@@ -123,6 +123,8 @@ class Det3DDataPreprocessor(DetDataPreprocessor):
         if voxel:
             self.voxel_layer = VoxelizationByGridShape(**voxel_layer)
 
+        self.pc_range_tensor = torch.tensor(self.voxel_layer.point_cloud_range)
+
     def forward(self,
                 data: Union[dict, List[dict]],
                 training: bool = False) -> Union[dict, List[dict]]:
@@ -149,7 +151,8 @@ class Det3DDataPreprocessor(DetDataPreprocessor):
             return aug_batch_data
 
         else:
-            return self.simple_process(data, training)
+            y = self.simple_process(data, training)
+            return y
 
     def simple_process(self, data: dict, training: bool = False) -> dict:
         """Perform normalization, padding and bgr2rgb conversion for img data
@@ -383,13 +386,18 @@ class Det3DDataPreprocessor(DetDataPreprocessor):
             voxel_dict['num_points'] = num_points
             voxel_dict['voxel_centers'] = voxel_centers
         elif self.voxel_type == 'dynamic':
+            # NOTE(yoko) modified to ignore out of ROI
             coors = []
+            voxels = []
             # dynamic voxelization only provide a coors mapping
             for i, res in enumerate(points):
                 res_coors = self.voxel_layer(res)
+                within_roi = ~torch.any(res_coors == -1, dim=1)
+                res_coors = res_coors[within_roi]
                 res_coors = F.pad(res_coors, (1, 0), mode='constant', value=i)
                 coors.append(res_coors)
-            voxels = torch.cat(points, dim=0)
+                voxels.append(res[within_roi])
+            voxels = torch.cat(voxels, dim=0)
             coors = torch.cat(coors, dim=0)
         elif self.voxel_type == 'cylindrical':
             voxels, coors = [], []
@@ -458,7 +466,26 @@ class Det3DDataPreprocessor(DetDataPreprocessor):
                 coors.append(res_voxel_coors)
             voxels = torch.cat(voxels, dim=0)
             coors = torch.cat(coors, dim=0)
-
+        elif self.voxel_type == 'quantize':
+            voxels, coors = [], []
+            self.pc_range_tensor = self.pc_range_tensor.to(points[0].device)
+            # res:(N,5) XYZIT?, coors:(N,4) BZYX
+            for i, res in enumerate(points):
+                valid_pnts = torch.all(
+                    res[:, :3] > self.pc_range_tensor[:3], dim=1) * torch.all(
+                        res[:, :3] < self.pc_range_tensor[3:6], dim=1)
+                res = res[valid_pnts]
+                res_coors, indices = sparse_quantize(
+                    res, self.voxel_layer.voxel_size,
+                    self.voxel_layer.point_cloud_range)
+                res_voxels = res[indices]
+                time_index = torch.zeros_like(indices) + i
+                res_coors = torch.cat(
+                    [time_index[:, None], res_coors[:, [2, 1, 0]]], dim=1)
+                voxels.append(res_voxels)
+                coors.append(res_coors)
+            voxels = torch.cat(voxels, dim=0)
+            coors = torch.cat(coors, dim=0)
         else:
             raise ValueError(f'Invalid voxelization type {self.voxel_type}')
 
@@ -491,52 +518,52 @@ class Det3DDataPreprocessor(DetDataPreprocessor):
                                                        res_coors, 'mean', True)
             data_sample.point2voxel_map = point2voxel_map
 
-    def ravel_hash(self, x: np.ndarray) -> np.ndarray:
-        """Get voxel coordinates hash for np.unique.
 
-        Args:
-            x (np.ndarray): The voxel coordinates of points, Nx3.
+def sparse_quantize(
+    points: torch.Tensor,
+    voxel_size: Union[float, Tuple[float, ...]],
+    min_range,
+    dim=0,
+) -> List[np.ndarray]:
+    # if isinstance(voxel_size, (float, int)):
+    #     voxel_size = tuple(repeat(voxel_size, 3))
+    # assert isinstance(voxel_size, tuple) and len(voxel_size) == 3
 
-        Returns:
-            np.ndarray: Voxels coordinates hash.
-        """
-        assert x.ndim == 2, x.shape
+    voxel_size = torch.tensor(voxel_size, device=points.device)
+    coords = points[:, :3].clone()
+    min_range = torch.tensor(min_range[:3], device=points.device)
+    coords -= min_range
+    coords = torch.floor(coords / voxel_size).to(torch.int32)
 
-        x = x - np.min(x, axis=0)
-        x = x.astype(np.uint64, copy=False)
-        xmax = np.max(x, axis=0).astype(np.uint64) + 1
+    unique, inverse_indices = torch.unique(
+        ravel_hash(coords), return_inverse=True)
 
-        h = np.zeros(x.shape[0], dtype=np.uint64)
+    perm = torch.arange(
+        inverse_indices.size(dim),
+        dtype=inverse_indices.dtype,
+        device=inverse_indices.device)
+    inverse_indices, perm = inverse_indices.flip([dim]), perm.flip([dim])
+    indices = inverse_indices.new_empty(unique.size(dim)).scatter_(
+        dim, inverse_indices, perm)
+
+    unique_coords = coords[indices]
+    return unique_coords, indices
+
+
+def ravel_hash(x: np.ndarray) -> np.ndarray:
+    # assert x.ndim == 2, x.shape
+
+    x = x - torch.amin(x, axis=0)
+    x = x.to(torch.int32)
+    xmax = torch.amax(x, axis=0).to(torch.int32) + 1
+
+    h = torch.zeros(x.shape[0], dtype=torch.int32, device=x.device)
+    if True:
         for k in range(x.shape[1] - 1):
             h += x[:, k]
             h *= xmax[k + 1]
         h += x[:, -1]
         return h
-
-    def sparse_quantize(self,
-                        coords: np.ndarray,
-                        return_index: bool = False,
-                        return_inverse: bool = False) -> List[np.ndarray]:
-        """Sparse Quantization for voxel coordinates used in Minkunet.
-
-        Args:
-            coords (np.ndarray): The voxel coordinates of points, Nx3.
-            return_index (bool): Whether to return the indices of the unique
-                coords, shape (M,).
-            return_inverse (bool): Whether to return the indices of the
-                original coords, shape (N,).
-
-        Returns:
-            List[np.ndarray]: Return index and inverse map if return_index and
-            return_inverse is True.
-        """
-        _, indices, inverse_indices = np.unique(
-            self.ravel_hash(coords), return_index=True, return_inverse=True)
-        coords = coords[indices]
-
-        outputs = []
-        if return_index:
-            outputs += [indices]
-        if return_inverse:
-            outputs += [inverse_indices]
-        return outputs
+    else:
+        h = x[:, 0] + xmax[0] * (x[:, 1] + x[:, 2] * xmax[1])
+        return h
