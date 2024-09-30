@@ -1,6 +1,6 @@
 _base_ = [
     '../_base_/datasets/nus-3d.py',
-    '../_base_/models/flatformer_voxel02_second_secfpn_nus.py',
+    '../_base_/models/flatformer_dynamic_voxel032_second_secfpn_nus.py',
     '../_base_/schedules/cyclic-20e.py', '../_base_/default_runtime.py'
 ]
 
