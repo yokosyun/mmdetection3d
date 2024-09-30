@@ -64,7 +64,7 @@ python3.8 tools/train.py configs/centerpoint/centerpoint_pillar02_second_secfpn_
 ```
 
 ```
-python3.8 tools/train.py configs/centerpoint/centerpoint_pillar02_second_secfpn_8xb4-cyclic-20e_nus-3d_flatformer.py --amp
+python3.8 tools/train.py configs/flatformer/flatformer_quantize_voxel02_second_secfpn_8xb4-cyclic-20e_nus-3d_flatformer.py --amp
 ```
 
 ### inference
@@ -83,6 +83,48 @@ demo/data/nuscenes/n015-2018-07-24-11-22-45+0800__LIDAR_TOP__1532402927647951.pc
 configs/centerpoint/centerpoint_pillar02_second_secfpn_8xb4-cyclic-20e_nus-3d_flatformer.py \
 inputs/ckpts/centerpoint_pillar02_second_secfpn_8xb4-cyclic-20e_nus-3d_flatformer_epoch_20.pth \
 --show
+```
+
+```
+python3.8 demo/pcd_demo.py \
+demo/data/nuscenes/n015-2018-07-24-11-22-45+0800__LIDAR_TOP__1532402927647951.pcd.bin \
+configs/centerpoint/centerpoint_pillar02_second_secfpn_8xb4-cyclic-20e_nus-3d_flatformer_dynamic.py \
+inputs/ckpts/centerpoint_pillar02_second_secfpn_8xb4-cyclic-20e_nus-3d_flatformer_dynamic_epoch_1.pth \
+--show
+```
+
+```
+python3.8 demo/pcd_demo.py demo/data/nuscenes/n015-2018-07-24-11-22-45+0800__LIDAR_TOP__1532402927647951.pcd.bin configs/flatformer/flatformer_voxel02_second_secfpn_8xb4-cyclic-20e_nus-3d_flatformer_quantize.py inputs/ckpts/flatformer_voxel02_second_secfpn_8xb4-cyclic-20e_nus-3d_flatformer_quantize_epoch_5.pth --show
+```
+
+### Benchmark
+
+```
+python3.8 tools/analysis_tools/benchmark.py \
+configs/centerpoint/centerpoint_voxel01_second_secfpn_head-circlenms_8xb4-cyclic-20e_nus-3d.py \
+inputs/ckpts/centerpoint_01voxel_second_secfpn_circlenms_4x8_cyclic_20e_nus_20220810_030004-9061688e.pth \
+--amp
+```
+
+```
+python3.8 tools/analysis_tools/benchmark.py \
+configs/centerpoint/centerpoint_pillar02_second_secfpn_8xb4-cyclic-20e_nus-3d_flatformer.py \
+inputs/ckpts/centerpoint_pillar02_second_secfpn_8xb4-cyclic-20e_nus-3d_flatformer_epoch_20.pth \
+--amp
+```
+
+```
+python3.8 tools/analysis_tools/benchmark.py \
+configs/centerpoint/centerpoint_pillar02_second_secfpn_8xb4-cyclic-20e_nus-3d_flatformer_dynamic.py \
+inputs/ckpts/centerpoint_pillar02_second_secfpn_8xb4-cyclic-20e_nus-3d_flatformer_dynamic_epoch_1.pth \
+--amp
+```
+
+```
+python3.8 tools/analysis_tools/benchmark.py \
+configs/flatformer/flatformer_voxel02_second_secfpn_8xb4-cyclic-20e_nus-3d_flatformer_quantize.py \
+inputs/ckpts/flatformer_voxel02_second_secfpn_8xb4-cyclic-20e_nus-3d_flatformer_quantize_epoch_5.pth \
+--amp
 ```
 
 ### Test
@@ -122,6 +164,24 @@ loss
 ```
 python tools/analysis_tools/analyze_logs.py plot_curve work_dirs/centerpoint_voxel01_second_secfpn_head-circlenms_8xb4-cyclic-20e_nus-3d/20240524_085003/vis_data/20240524_085003.json --keys loss
 plot curve of work_dirs/centerpoint_voxel01_second_secfpn_head-circlenms_8xb4-cyclic-20e_nus-3d/20240524_085003/vis_data/20240524_085003.json, metric is los
+```
+
+# Mean Voxel Feature
+
+- taking mean of voxel feature doesn't effect performance at all
+
+```
+class HardSimpleVFE
+if True:
+    points_mean = features[:, :, :self.num_features].sum(
+        dim=1, keepdim=False) / num_points.type_as(features).view(
+            -1, 1)
+    num_points, _ = points_mean.shape
+    # rand_x = torch.rand(num_points, device="cuda") * 10
+    # points_mean[:, 0] -= rand_x
+else:
+    points_mean = features[:, 0, :self.num_features]
+return points_mean.contiguous()
 ```
 
 # Reference
