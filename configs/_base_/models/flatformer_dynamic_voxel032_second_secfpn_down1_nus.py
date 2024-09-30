@@ -71,7 +71,7 @@ model = dict(
             code_size=9),
         separate_head=dict(
             type='SeparateHead', init_bias=-2.19, final_kernel=3),
-        norm_cfg=dict(type='naiveSyncBN2d', eps=1e-3, momentum=0.01),
+        # norm_cfg=dict(type='naiveSyncBN2d', eps=1e-3, momentum=0.01),
         loss_cls=dict(type='mmdet.GaussianFocalLoss', reduction='mean'),
         loss_bbox=dict(type='mmdet.L1Loss', reduction='mean', loss_weight=2),
         norm_bbox=True),

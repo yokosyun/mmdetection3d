@@ -67,6 +67,10 @@ python3.8 tools/train.py configs/centerpoint/centerpoint_pillar02_second_secfpn_
 python3.8 tools/train.py configs/flatformer/flatformer_quantize_voxel02_second_secfpn_8xb4-cyclic-20e_nus-3d_flatformer.py --amp
 ```
 
+```
+python3.8 tools/train.py configs/flatformer/flatformer_dynamic_voxel032_second_secfpn_down1_8xb4-cyclic-20e_nus-3d.py --amp
+```
+
 ### inference
 
 ```
@@ -115,8 +119,8 @@ inputs/ckpts/centerpoint_pillar02_second_secfpn_8xb4-cyclic-20e_nus-3d_flatforme
 
 ```
 python3.8 tools/analysis_tools/benchmark.py \
-configs/centerpoint/centerpoint_pillar02_second_secfpn_8xb4-cyclic-20e_nus-3d_flatformer_dynamic.py \
-inputs/ckpts/centerpoint_pillar02_second_secfpn_8xb4-cyclic-20e_nus-3d_flatformer_dynamic_epoch_1.pth \
+configs/flatformer/flatformer_dynamic_voxel02_second_secfpn_8xb4-cyclic-20e_nus-3d.py \
+inputs/ckpts/flatformer_dynamic_voxel02_second_secfpn_8xb4-cyclic-20e_nus-3d_epoch_1.pth \
 --amp
 ```
 
