@@ -5,9 +5,3 @@ model = dict(test_cfg=dict(pts=dict(nms_type='circle')))
 default_hooks = dict(
     checkpoint=dict(
         type='CheckpointHook', interval=1, max_keep_ckpts=10, save_last=True))
-
-_base_.visualizer.vis_backends = [
-    # dict(type='LocalVisBackend'), #
-    dict(type='TensorboardVisBackend'),
-    # dict(type='WandbVisBackend'),
-]
