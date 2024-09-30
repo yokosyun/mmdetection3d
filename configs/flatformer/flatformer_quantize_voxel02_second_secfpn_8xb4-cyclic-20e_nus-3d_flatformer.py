@@ -4,12 +4,6 @@ _base_ = [
     '../_base_/schedules/cyclic-20e.py', '../_base_/default_runtime.py'
 ]
 
-_base_.visualizer.vis_backends = [
-    # dict(type='LocalVisBackend'), #
-    dict(type='TensorboardVisBackend'),
-    # dict(type='WandbVisBackend'),
-]
-
 # If point cloud range is changed, the models should also change their point
 # cloud range accordingly
 point_cloud_range = [-51.2, -51.2, -5.0, 51.2, 51.2, 3.0]
