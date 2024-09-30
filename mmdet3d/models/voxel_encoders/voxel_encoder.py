@@ -24,6 +24,20 @@ class SkipVFE(nn.Module):
 
 
 @MODELS.register_module()
+class MLPVFE(nn.Module):
+    """Do nothing."""
+
+    def __init__(self, in_channels: int, out_channels: int) -> None:
+        super(MLPVFE, self).__init__()
+        self.project = torch.nn.Linear(in_channels, out_channels)
+
+    def forward(self, features: Tensor, num_points: Tensor, coors: Tensor,
+                *args, **kwargs) -> Tensor:
+
+        return self.project(features)
+
+
+@MODELS.register_module()
 class HardSimpleVFE(nn.Module):
     """Simple voxel feature encoder used in SECOND.
 
