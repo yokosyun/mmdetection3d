@@ -124,6 +124,8 @@ class Det3DDataPreprocessor(DetDataPreprocessor):
         if voxel:
             self.voxel_layer = VoxelizationByGridShape(**voxel_layer)
 
+        self.pc_range_tensor = torch.tensor(self.voxel_layer.point_cloud_range)
+
     def forward(self,
                 data: Union[dict, List[dict]],
                 training: bool = False) -> Union[dict, List[dict]]:
@@ -470,16 +472,25 @@ class Det3DDataPreprocessor(DetDataPreprocessor):
             voxels = torch.cat(voxels, dim=0)
             coors = torch.cat(coors, dim=0)
         elif self.voxel_type == 'quantize':
+            voxels, coors = [], []
+            self.pc_range_tensor = self.pc_range_tensor.to(points[0].device)
+            # res:(N,5) XYZIT?, coors:(N,4) BZYX
             for i, res in enumerate(points):
-                points = res
-
-                coors, indices = sparse_quantize(
-                    points, self.voxel_layer.voxel_size,
+                valid_pnts = torch.all(
+                    res[:, :3] > self.pc_range_tensor[:3], dim=1) * torch.all(
+                        res[:, :3] < self.pc_range_tensor[3:6], dim=1)
+                res = res[valid_pnts]
+                res_coors, indices = sparse_quantize(
+                    res, self.voxel_layer.voxel_size,
                     self.voxel_layer.point_cloud_range)
-                voxels = points[indices]
+                res_voxels = res[indices]
                 time_index = torch.zeros_like(indices) + i
-                coors = torch.cat([time_index[:, None], coors[:, [2, 1, 0]]],
-                                  dim=1)
+                res_coors = torch.cat(
+                    [time_index[:, None], res_coors[:, [2, 1, 0]]], dim=1)
+                voxels.append(res_voxels)
+                coors.append(res_coors)
+            voxels = torch.cat(voxels, dim=0)
+            coors = torch.cat(coors, dim=0)
         else:
             raise ValueError(f'Invalid voxelization type {self.voxel_type}')
 
