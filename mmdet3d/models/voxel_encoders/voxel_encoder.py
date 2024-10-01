@@ -299,7 +299,14 @@ class DynamicVFE(nn.Module):
                     and img_feats is not None):
                 point_feats = self.fusion_layer(img_feats, points, point_feats,
                                                 img_metas)
+
+            # TODO(yoko) temporally fix. fp16 is not implemented
+            is_half = point_feats.dtype == torch.float16
+            if is_half:
+                point_feats = point_feats.to(torch.float32)
             voxel_feats, voxel_coors = self.vfe_scatter(point_feats, coors)
+            if is_half:
+                voxel_feats = voxel_feats.to(torch.float16)
             if i != len(self.vfe_layers) - 1:
                 # need to concat voxel feats if it is not the last vfe
                 feat_per_point = self.map_voxel_center_to_point(
