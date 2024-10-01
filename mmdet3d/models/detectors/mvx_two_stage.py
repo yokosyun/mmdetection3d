@@ -406,19 +406,24 @@ class MVXTwoStageDetector(Base3DDetector):
             - bbox_3d (:obj:`BaseInstance3DBoxes`): Prediction of bboxes,
                 contains a tensor with shape (num_instances, 7).
         """
+        torch.cuda.synchronize()
         start_time = time.time()
         batch_input_metas = [item.metainfo for item in batch_data_samples]
+        torch.cuda.synchronize()
         end_time = time.time()
         elapsed = (end_time - start_time) * 1000
         print(f'MVXTwoStageDetector:for ={elapsed:.3f}[ms]')
 
+        torch.cuda.synchronize()
         start_time = time.time()
         img_feats, pts_feats = self.extract_feat(batch_inputs_dict,
                                                  batch_input_metas)
+        torch.cuda.synchronize()
         end_time = time.time()
         elapsed = (end_time - start_time) * 1000
         print(f'MVXTwoStageDetector:extract_feat ={elapsed:.3f}[ms]')
 
+        torch.cuda.synchronize()
         start_time = time.time()
         if pts_feats and self.with_pts_bbox:
             results_list_3d = self.pts_bbox_head.predict(
@@ -426,10 +431,12 @@ class MVXTwoStageDetector(Base3DDetector):
         else:
             results_list_3d = None
 
+        torch.cuda.synchronize()
         end_time = time.time()
         elapsed = (end_time - start_time) * 1000
         print(f'MVXTwoStageDetector:predict ={elapsed:.3f}[ms]')
 
+        torch.cuda.synchronize()
         start_time = time.time()
         if img_feats and self.with_img_bbox:
             # TODO check this for camera modality
@@ -442,6 +449,7 @@ class MVXTwoStageDetector(Base3DDetector):
                                                  results_list_3d,
                                                  results_list_2d)
 
+        torch.cuda.synchronize()
         end_time = time.time()
         elapsed = (end_time - start_time) * 1000
         print(f'MVXTwoStageDetector:add_pred ={elapsed:.3f}[ms]')
