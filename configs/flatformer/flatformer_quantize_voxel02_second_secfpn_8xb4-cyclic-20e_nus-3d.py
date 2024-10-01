@@ -1,6 +1,6 @@
 _base_ = [
     '../_base_/datasets/nus-3d.py',
-    '../_base_/models/centerpoint_pillar02_second_secfpn_nus.py',
+    '../_base_/models/flatformer_quantize_voxel02_second_secfpn_nus.py',
     '../_base_/schedules/cyclic-20e.py', '../_base_/default_runtime.py'
 ]
 
@@ -19,7 +19,7 @@ data_prefix = dict(pts='samples/LIDAR_TOP', img='', sweeps='sweeps/LIDAR_TOP')
 model = dict(
     data_preprocessor=dict(
         voxel_layer=dict(point_cloud_range=point_cloud_range)),
-    pts_voxel_encoder=dict(point_cloud_range=point_cloud_range),
+    # pts_voxel_encoder=dict(point_cloud_range=point_cloud_range),
     pts_bbox_head=dict(bbox_coder=dict(pc_range=point_cloud_range[:2])),
     # model training and testing settings
     train_cfg=dict(pts=dict(point_cloud_range=point_cloud_range)),

@@ -1,13 +1,7 @@
 _base_ = [
     '../_base_/datasets/nus-3d.py',
-    '../_base_/models/flatformer_voxel02_second_secfpn_nus_quantize.py',
+    '../_base_/models/flatformer_dynamic_voxel032_second_secfpn_down1_nus.py',
     '../_base_/schedules/cyclic-20e.py', '../_base_/default_runtime.py'
-]
-
-_base_.visualizer.vis_backends = [
-    # dict(type='LocalVisBackend'), #
-    dict(type='TensorboardVisBackend'),
-    # dict(type='WandbVisBackend'),
 ]
 
 # If point cloud range is changed, the models should also change their point
@@ -25,7 +19,7 @@ data_prefix = dict(pts='samples/LIDAR_TOP', img='', sweeps='sweeps/LIDAR_TOP')
 model = dict(
     data_preprocessor=dict(
         voxel_layer=dict(point_cloud_range=point_cloud_range)),
-    # pts_voxel_encoder=dict(point_cloud_range=point_cloud_range),
+    pts_voxel_encoder=dict(point_cloud_range=point_cloud_range),
     pts_bbox_head=dict(bbox_coder=dict(pc_range=point_cloud_range[:2])),
     # model training and testing settings
     train_cfg=dict(pts=dict(point_cloud_range=point_cloud_range)),
@@ -138,7 +132,7 @@ test_pipeline = [
 
 train_dataloader = dict(
     _delete_=True,
-    batch_size=2,
+    batch_size=1,
     num_workers=4,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
