@@ -363,12 +363,8 @@ class GlobalFormer(nn.Module):
         src_key_padding_mask = ~padding_mask
         feats_global = self.transformer(
             feats_pool, src_key_padding_mask=src_key_padding_mask)
-        print('before mask=', torch.sum(torch.isnan(feats_global)),
-              torch.sum(torch.isinf(feats_global)))
 
         feats_global = feats_global[padding_mask]
-        print('after mask=', torch.sum(torch.isnan(feats_global)),
-              torch.sum(torch.isinf(feats_global)))
 
         feats_global = feats_global.unsqueeze(2).repeat(1, 1, self.group_size)
 
