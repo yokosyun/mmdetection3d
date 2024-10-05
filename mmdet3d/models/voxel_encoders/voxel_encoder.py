@@ -25,11 +25,17 @@ class SkipVFE(nn.Module):
 
 @MODELS.register_module()
 class MLPVFE(nn.Module):
-    """Do nothing."""
+    """MLP layer for each points."""
 
     def __init__(self, in_channels: int, out_channels: int) -> None:
         super(MLPVFE, self).__init__()
-        self.project = torch.nn.Linear(in_channels, out_channels)
+        self.project = torch.nn.Sequential(
+            torch.nn.Linear(in_channels, out_channels // 2, bias=False),
+            torch.nn.BatchNorm1d(out_channels // 2),
+            torch.nn.ReLU(),
+            torch.nn.Linear(out_channels // 2, out_channels, bias=False),
+            torch.nn.BatchNorm1d(out_channels),
+        )
 
     def forward(self, features: Tensor, num_points: Tensor, coors: Tensor,
                 *args, **kwargs) -> Tensor:
@@ -299,7 +305,14 @@ class DynamicVFE(nn.Module):
                     and img_feats is not None):
                 point_feats = self.fusion_layer(img_feats, points, point_feats,
                                                 img_metas)
+
+            # TODO(yoko) temporally fix. fp16 is not implemented
+            is_half = point_feats.dtype == torch.float16
+            if is_half:
+                point_feats = point_feats.to(torch.float32)
             voxel_feats, voxel_coors = self.vfe_scatter(point_feats, coors)
+            if is_half:
+                voxel_feats = voxel_feats.to(torch.float16)
             if i != len(self.vfe_layers) - 1:
                 # need to concat voxel feats if it is not the last vfe
                 feat_per_point = self.map_voxel_center_to_point(

@@ -125,6 +125,9 @@ class Det3DDataPreprocessor(DetDataPreprocessor):
             self.voxel_layer = VoxelizationByGridShape(**voxel_layer)
 
         self.pc_range_tensor = torch.tensor(self.voxel_layer.point_cloud_range)
+        # TODO(yoko) check better solution
+        self.pc_range_tensor[3:] -= torch.finfo(
+            torch.float16).eps  # to avoid out of range from 3D/BEV mapping
 
     def forward(self,
                 data: Union[dict, List[dict]],
