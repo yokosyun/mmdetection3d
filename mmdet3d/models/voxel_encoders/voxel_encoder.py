@@ -25,11 +25,17 @@ class SkipVFE(nn.Module):
 
 @MODELS.register_module()
 class MLPVFE(nn.Module):
-    """Do nothing."""
+    """MLP layer for each points."""
 
     def __init__(self, in_channels: int, out_channels: int) -> None:
         super(MLPVFE, self).__init__()
-        self.project = torch.nn.Linear(in_channels, out_channels)
+        self.project = torch.nn.Sequential(
+            torch.nn.Linear(in_channels, out_channels // 2, bias=False),
+            torch.nn.BatchNorm1d(out_channels // 2),
+            torch.nn.ReLU(),
+            torch.nn.Linear(out_channels // 2, out_channels, bias=False),
+            torch.nn.BatchNorm1d(out_channels),
+        )
 
     def forward(self, features: Tensor, num_points: Tensor, coors: Tensor,
                 *args, **kwargs) -> Tensor:
