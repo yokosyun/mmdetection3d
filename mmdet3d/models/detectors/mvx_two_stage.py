@@ -208,32 +208,40 @@ class MVXTwoStageDetector(Base3DDetector):
         if not self.with_pts_bbox:
             return None
 
+        torch.cuda.synchronize()
         start_time = time.time()
         voxel_features = self.pts_voxel_encoder(
             voxel_dict['voxels'], voxel_dict.get('num_points', None),
             voxel_dict['coors'], img_feats, batch_input_metas)
+        torch.cuda.synchronize()
         end_time = time.time()
         elapsed = (end_time - start_time) * 1000
         print(f'pts_voxel_encoder ={elapsed:.3f}[ms]')
 
         batch_size = voxel_dict['coors'][-1, 0] + 1
 
+        torch.cuda.synchronize()
         start_time = time.time()
         x = self.pts_middle_encoder(voxel_features, voxel_dict['coors'],
                                     batch_size)
+        torch.cuda.synchronize()
         end_time = time.time()
         elapsed = (end_time - start_time) * 1000
         print(f'pts_middle_encoder ={elapsed:.3f}[ms]')
 
+        torch.cuda.synchronize()
         start_time = time.time()
         x = self.pts_backbone(x)
+        torch.cuda.synchronize()
         end_time = time.time()
         elapsed = (end_time - start_time) * 1000
         print(f'pts_backbone ={elapsed:.3f}[ms]')
 
+        torch.cuda.synchronize()
         start_time = time.time()
         if self.with_pts_neck:
             x = self.pts_neck(x)
+        torch.cuda.synchronize()
         end_time = time.time()
         elapsed = (end_time - start_time) * 1000
         print(f'pts_neck ={elapsed:.3f}[ms]')
