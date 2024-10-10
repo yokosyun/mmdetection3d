@@ -183,4 +183,4 @@ test_dataloader = dict(
 val_dataloader = dict(
     dataset=dict(pipeline=test_pipeline, metainfo=dict(classes=class_names)))
 
-train_cfg = dict(val_interval=1)
+train_cfg = dict(val_interval=5)
