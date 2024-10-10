@@ -49,23 +49,24 @@ class SparseEncoder(nn.Module):
     """
 
     def __init__(
-        self,
-        in_channels: int,
-        sparse_shape: List[int],
-        order: Optional[Tuple[str]] = ('conv', 'norm', 'act'),
-        norm_cfg: Optional[dict] = dict(type='BN1d', eps=1e-3, momentum=0.01),
-        base_channels: Optional[int] = 16,
-        output_channels: Optional[int] = 128,
-        encoder_channels: Optional[TwoTupleIntType] = ((16, ), (32, 32, 32),
-                                                       (64, 64, 64), (64, 64,
-                                                                      64)),
-        encoder_paddings: Optional[TwoTupleIntType] = ((1, ), (1, 1, 1),
-                                                       (1, 1, 1), ((0, 1, 1),
-                                                                   1, 1)),
-        block_type: Optional[str] = 'conv_module',
-        return_middle_feats: Optional[bool] = False,
-        down_kernel_size=3,
-    ):
+            self,
+            in_channels: int,
+            sparse_shape: List[int],
+            order: Optional[Tuple[str]] = ('conv', 'norm', 'act'),
+            norm_cfg: Optional[dict] = dict(
+                type='BN1d', eps=1e-3, momentum=0.01),
+            base_channels: Optional[int] = 16,
+            output_channels: Optional[int] = 128,
+            encoder_channels: Optional[TwoTupleIntType] = ((16, ), (32, 32,
+                                                                    32),
+                                                           (64, 64,
+                                                            64), (64, 64, 64)),
+            encoder_paddings: Optional[TwoTupleIntType] = ((1, ), (1, 1, 1),
+                                                           (1, 1, 1),
+                                                           ((0, 1, 1), 1, 1)),
+            block_type: Optional[str] = 'conv_module',
+            return_middle_feats: Optional[bool] = False,
+            down_kernel_size=3):
         super().__init__()
         assert block_type in ['conv_module', 'basicblock']
         self.sparse_shape = sparse_shape
