@@ -65,7 +65,8 @@ class SparseEncoder(nn.Module):
                                                            (1, 1, 1),
                                                            ((0, 1, 1), 1, 1)),
             block_type: Optional[str] = 'conv_module',
-            return_middle_feats: Optional[bool] = False):
+            return_middle_feats: Optional[bool] = False,
+            down_kernel_size=3):
         super().__init__()
         assert block_type in ['conv_module', 'basicblock']
         self.sparse_shape = sparse_shape
@@ -77,6 +78,7 @@ class SparseEncoder(nn.Module):
         self.encoder_paddings = encoder_paddings
         self.stage_num = len(self.encoder_channels)
         self.return_middle_feats = return_middle_feats
+        self.down_kernel_size = down_kernel_size
         # Spconv init all weight on its own
 
         assert isinstance(order, tuple) and len(order) == 3
@@ -198,7 +200,7 @@ class SparseEncoder(nn.Module):
                         make_block(
                             in_channels,
                             out_channels,
-                            3,
+                            self.down_kernel_size,
                             norm_cfg=norm_cfg,
                             stride=2,
                             padding=padding,
@@ -211,7 +213,7 @@ class SparseEncoder(nn.Module):
                             make_block(
                                 in_channels,
                                 out_channels,
-                                3,
+                                self.down_kernel_size,
                                 norm_cfg=norm_cfg,
                                 stride=2,
                                 padding=padding,
