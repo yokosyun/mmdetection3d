@@ -101,7 +101,8 @@ class Det3DDataPreprocessor(DetDataPreprocessor):
                  rgb_to_bgr: bool = False,
                  boxtype2tensor: bool = True,
                  non_blocking: bool = False,
-                 batch_augments: Optional[List[dict]] = None) -> None:
+                 batch_augments: Optional[List[dict]] = None,
+                 flip=True) -> None:
         super(Det3DDataPreprocessor, self).__init__(
             mean=mean,
             std=std,
@@ -120,6 +121,7 @@ class Det3DDataPreprocessor(DetDataPreprocessor):
         self.voxel_type = voxel_type
         self.batch_first = batch_first
         self.max_voxels = max_voxels
+        self.flip = flip
         if voxel:
             self.voxel_layer = VoxelizationByGridShape(**voxel_layer)
             self.pc_range_tensor = torch.tensor(
@@ -479,8 +481,10 @@ class Det3DDataPreprocessor(DetDataPreprocessor):
                         res[:, :3] < self.pc_range_tensor[3:6], dim=1)
                 res = res[valid_pnts]
                 res_coors, indices = sparse_quantize(
-                    res, self.voxel_layer.voxel_size,
-                    self.voxel_layer.point_cloud_range)
+                    res,
+                    self.voxel_layer.voxel_size,
+                    self.voxel_layer.point_cloud_range,
+                    flip=self.flip)
                 res_voxels = res[indices]
                 time_index = torch.zeros_like(indices) + i
                 res_coors = torch.cat(
@@ -575,6 +579,7 @@ def sparse_quantize(
     voxel_size: Union[float, Tuple[float, ...]],
     min_range,
     dim=0,
+    flip=True,
 ) -> List[np.ndarray]:
     # if isinstance(voxel_size, (float, int)):
     #     voxel_size = tuple(repeat(voxel_size, 3))
@@ -593,7 +598,8 @@ def sparse_quantize(
         inverse_indices.size(dim),
         dtype=inverse_indices.dtype,
         device=inverse_indices.device)
-    inverse_indices, perm = inverse_indices.flip([dim]), perm.flip([dim])
+    if flip:
+        inverse_indices, perm = inverse_indices.flip([dim]), perm.flip([dim])
     indices = inverse_indices.new_empty(unique.size(dim)).scatter_(
         dim, inverse_indices, perm)
 
