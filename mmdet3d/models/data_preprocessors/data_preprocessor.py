@@ -1,5 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import math
+import time
 from numbers import Number
 from typing import Dict, List, Optional, Sequence, Tuple, Union
 
@@ -156,7 +157,11 @@ class Det3DDataPreprocessor(DetDataPreprocessor):
             return aug_batch_data
 
         else:
+            start_time = time.time()
             y = self.simple_process(data, training)
+            end_time = time.time()
+            elapsed = (end_time - start_time) * 1000
+            print(f'Det3DDataPreprocessor:simple_process ={elapsed:.3f}[ms]')
             return y
 
     def simple_process(self, data: dict, training: bool = False) -> dict:
