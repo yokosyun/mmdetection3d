@@ -491,3 +491,43 @@ class FlatFormer(nn.Module):
         batch_canvas = batch_canvas.view(batch_size, feat_dim, ny, nx)
 
         return batch_canvas
+
+
+def test_window():
+
+    sparse_shape = [9, 9, 1]
+    window_shape = [3, 3, 1]
+    x = torch.arange(sparse_shape[0])
+    y = torch.arange(sparse_shape[1])
+
+    grid_x, grid_y = torch.meshgrid(x, y, indexing='ij')
+    coords = torch.stack([
+        torch.zeros(sparse_shape[0] * sparse_shape[1]),
+        torch.zeros(sparse_shape[0] * sparse_shape[1]),
+        grid_y.reshape(-1),
+        grid_x.reshape(-1)
+    ],
+                         dim=1)
+
+    for shifted in [False]:
+        (
+            n2,
+            m2,
+            n1,
+            m1,
+            x1,
+            y1,
+            x2,
+            y2,
+        ) = get_window_coors_shift(
+            coords, sparse_shape, window_shape, shifted=shifted)
+        vx = (n1 * y1 + (-1)**y1 * x1) * n2 * m2 + (-1)**y1 * (
+            m2 * x2 + (-1)**x2 * y2 * (-1)**y1)
+        vx += coords[:, 0] * sparse_shape[0] * sparse_shape[1] * 10
+
+        vy = (m1 * x1 + (-1)**x1 * y1) * m2 * n2 + (-1)**x1 * (
+            n2 * y2 + (-1)**y2 * x2)
+        vy += coords[:, 0] * sparse_shape[0] * sparse_shape[1] * 10
+
+
+# test_window()
