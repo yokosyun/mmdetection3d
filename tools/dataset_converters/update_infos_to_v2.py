@@ -275,8 +275,25 @@ def update_nuscenes_infos(pkl_path, out_dir):
     converted_list = []
     for i, ori_info_dict in enumerate(
             mmengine.track_iter_progress(data_list['infos'])):
+
         temp_data_info = get_empty_standard_data_info(
             camera_types=camera_types)
+        temp_data_info['prev'] = ori_info_dict['prev']
+        temp_data_info['next'] = ori_info_dict['next']
+        temp_data_info['next'] = ori_info_dict['next']
+        temp_data_info['frame_idx'] = ori_info_dict['frame_idx']
+        temp_data_info['radar_sweeps'] = ori_info_dict['radar_sweeps']
+        temp_data_info['radars'] = ori_info_dict['radars']
+        temp_data_info['scene_token'] = ori_info_dict['scene_token']
+        temp_data_info['radar_timestamp'] = ori_info_dict['radar_timestamp']
+        temp_data_info['radar_sweeps_time_gap'] = ori_info_dict[
+            'radar_sweeps_time_gap']
+        temp_data_info['radar_sweeps_r2l_rot'] = ori_info_dict[
+            'radar_sweeps_r2l_rot']
+        temp_data_info['radar_sweeps_r2l_trans'] = ori_info_dict[
+            'radar_sweeps_r2l_trans']
+        # temp_data_info['radar_ms_pts'] = ori_info_dict['radar_ms_pts']
+
         temp_data_info['sample_idx'] = i
         temp_data_info['token'] = ori_info_dict['token']
         temp_data_info['ego2global'] = convert_quaternion_to_matrix(
