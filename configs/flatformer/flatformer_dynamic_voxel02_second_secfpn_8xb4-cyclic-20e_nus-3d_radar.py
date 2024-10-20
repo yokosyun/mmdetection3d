@@ -1,7 +1,7 @@
 _base_ = [
     '../_base_/datasets/nus-3d.py',
     '../_base_/models/flatformer_dynamic_voxel02_second_secfpn_nus_radar.py',
-    '../_base_/schedules/cyclic-20e.py', '../_base_/default_runtime.py'
+    '../_base_/schedules/cyclic-40e.py', '../_base_/default_runtime.py'
 ]
 
 # If point cloud range is changed, the models should also change their point
@@ -12,16 +12,8 @@ point_cloud_range = [-51.2, -51.2, -5.0, 51.2, 51.2, 3.0]
 # point_cloud_range = [-51.2, -52, -5.0, 51.2, 50.4, 3.0]
 # For nuScenes we usually do 10-class detection
 class_names = [
-    'car',
-    'truck',
-    'construction_vehicle',
-    'bus',
-    'trailer',
-    # 'barrier',
-    'motorcycle',
-    'bicycle',
-    # 'pedestrian',
-    # 'traffic_cone'
+    'car', 'truck', 'construction_vehicle', 'bus', 'trailer', 'barrier',
+    'motorcycle', 'bicycle', 'pedestrian', 'traffic_cone'
 ]
 data_prefix = dict(pts='samples/LIDAR_TOP', img='', sweeps='sweeps/LIDAR_TOP')
 model = dict(
