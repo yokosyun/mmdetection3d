@@ -194,6 +194,9 @@ class BasePoints:
             self.tensor[:, :3] = self.tensor[:, :3] @ rotation
             rot_mat_T = rotation
 
+        # rotate velocity
+        self.tensor[:, 4:6] = self.tensor[:, 4:6] @ rot_mat_T[:2, :2]
+
         return rot_mat_T
 
     @abstractmethod

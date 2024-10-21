@@ -84,8 +84,8 @@ train_pipeline = [
     # dict(type='ObjectSample', db_sampler=db_sampler),
     dict(
         type='GlobalRotScaleTrans',
-        # rot_range=[-0.3925, 0.3925],
-        rot_range=[0.0, 0.0],
+        rot_range=[-0.3925, 0.3925],
+        # rot_range=[0.0, 0.0],
         scale_ratio_range=[0.95, 1.05],
         # translation_std=[0, 0, 0]),
         translation_std=[0.25, 0.25, 0.25]),
