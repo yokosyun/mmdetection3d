@@ -89,6 +89,24 @@ train_pipeline = [
         scale_ratio_range=[0.95, 1.05],
         # translation_std=[0, 0, 0]),
         translation_std=[0.25, 0.25, 0.25]),
+    # dict(
+    #     type='RadarRCSJitter', # trying. nan for fp16, fp32 can train but slower convergence
+    #     jitter_std= 0.1,
+    #     clip_range=[-0.15, 0.15],
+    #     prob= 0.5,
+    #     ),
+    # dict(
+    #     type='RadarVelociyJitter', # fp16 failed. fp32 can train but slower convergence
+    #     jitter_std= [0.04, 0.04],
+    #     clip_range=[-0.05, 0.05],
+    #     prob= 0.5,
+    #     ),
+    # dict(
+    #     type='RadarXYZJitter', # fp16 failed. fp32 can train but slower convergence
+    #     jitter_std= [0.05, 0.05, 0],
+    #     clip_range=[-0.1, 0.1],
+    #     prob= 0.5,
+    #     ),
     dict(
         type='RandomFlip3D',
         sync_2d=False,
