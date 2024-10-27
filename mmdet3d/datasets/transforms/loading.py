@@ -160,6 +160,14 @@ class LoadRadarPointsFromMultiSweepsV3(object):
                 # print(np.max(points_sweep[:, 2]),np.min(points_sweep[:, 2])
                 points_sweep[:, 4:6] = points_sweep[:, 4:6] @ R[:2, :2]
                 points_sweep[:, :3] += T  # lidar coordinate radar point clouds
+                # print(points_sweep.shape, results['radar_sweeps_time_gap'][idx])
+                time_gap = np.repeat(results['radar_sweeps_time_gap'][idx],
+                                     points_sweep.shape[0])
+                # print(time_gap[:, None].shape)
+                # print(np.concatenate((points_sweep, time_gap[:, None]), axis=1).shape)
+                points_sweep = np.concatenate(
+                    (points_sweep, time_gap[:, None]), axis=1)
+
                 sweep_points_list.append(points_sweep)
 
         points = np.concatenate(sweep_points_list)
