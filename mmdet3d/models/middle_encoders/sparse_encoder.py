@@ -16,9 +16,23 @@ from mmdet3d.structures import BaseInstance3DBoxes
 if IS_SPCONV2_AVAILABLE:
     from spconv.pytorch import SparseConvTensor, SparseSequential
 else:
-    from mmcv.ops import SparseConvTensor, SparseSequential
+    from mmcv.ops import SparseConvTensor, SparseModule, SparseSequential
 
 TwoTupleIntType = Tuple[Tuple[int]]
+
+
+class MagnitudePruning(SparseModule):
+
+    def forward(self, x):
+        if isinstance(x, SparseConvTensor):
+            imp = torch.norm(x.features, p=2, dim=1)
+            top_vals, top_ind = torch.topk(imp, int(len(imp) * 0.9))
+            # import matplotlib.pyplot as plt
+            # plt.hist(imp.cpu().detach().numpy())
+            # plt.show()
+            x.features = x.features[top_ind]
+            x.indices = x.indices[top_ind]
+        return x
 
 
 @MODELS.register_module()
@@ -146,8 +160,10 @@ class SparseEncoder(nn.Module):
                                            self.sparse_shape, batch_size)
         x = self.conv_input(input_sp_tensor)
 
+        # print("-----------SparseEncoder---------------")
         encode_features = []
         for encoder_layer in self.encoder_layers:
+            # print(encoder_layer)
             x = encoder_layer(x)
             encode_features.append(x)
 
@@ -219,6 +235,7 @@ class SparseEncoder(nn.Module):
                                 padding=padding,
                                 indice_key=f'spconv{i + 1}',
                                 conv_type='SparseConv3d'))
+                        blocks_list.append(MagnitudePruning())
                     else:
                         blocks_list.append(
                             SparseBasicBlock(
