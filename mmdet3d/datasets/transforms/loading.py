@@ -170,10 +170,13 @@ class LoadRadarPointsFromMultiSweepsV3(object):
 
                 sweep_points_list.append(points_sweep)
 
+        print(len(sweep_points_list))
         points = np.concatenate(sweep_points_list)
         points[:, 2] = 0  # set zero for z-axis
 
-        # visualize_points(points.copy(), X_RANGE, Y_RANGE, VOXEL_RESOLUTIONS, results["lidar_points"].tensor.detach().numpy().copy())
+        visualize_points(
+            points.copy(), X_RANGE, Y_RANGE, VOXEL_RESOLUTIONS,
+            results['lidar_points'].tensor.detach().numpy().copy())
 
         points_class = get_points_type(self.coord_type)
         points = points_class(
@@ -1533,6 +1536,70 @@ def gen_grid(x_range, y_range,
     return line_set
 
 
+# def create_arrow(point, velocity):
+#     arrow = o3d.geometry.create_mesh_arrow(cylinder_radius=0.01, cone_radius=0.02, cylinder_height=0.05, cone_height=0.03)
+#     arrow.scale(np.linalg.norm(velocity), center=(0, 0, 0))
+#     arrow.translate(point)
+#     rotation_matrix = o3d.geometry.get_rotation_matrix_from_axis_angle([0, 0, 1], np.arctan2(velocity[1], velocity[0]))
+#     arrow.rotate(rotation_matrix, center=(0, 0, 0))
+#     return arrow
+
+# def create_arrow(point, velocity):
+#     # Create cylinder for the arrow shaft
+#     cylinder = o3d.geometry.CylinderMesh()
+#     cylinder.cylinder_radius = 0.01
+#     cylinder.cylinder_height = 0.05
+#     cylinder.translate(point)
+
+#     # Create cone for the arrow head
+#     cone = o3d.geometry.ConeMesh()
+#     cone.radius = 0.02
+#     cone.height = 0.03
+#     cone.translate(point + [0, 0, 0.05])
+
+#     # Align the cone with the velocity vector
+#     rotation_matrix = o3d.geometry.get_rotation_matrix_from_axis_angle([0, 0, 1], np.arctan2(velocity[1], velocity[0]))
+#     cone.rotate(rotation_matrix, center=cone.get_center())
+
+#     # Combine the cylinder and cone into a single mesh
+#     arrow_mesh = o3d.geometry.Mesh.merge([cylinder, cone])
+#     return arrow_mesh
+
+
+def create_arrow(point, velocity):
+    # Define vertices and faces for the arrow
+    vertices = np.array([
+        [0, 0, 0],  # Base of the shaft
+        [0, 0, 0.05],  # Top of the shaft
+        [-0.01, -0.01, 0.05],  # Base of the head
+        [0.01, -0.01, 0.05],
+        [0, 0.02, 0.08],  # Tip of the head
+    ])
+
+    triangles = np.array([
+        [0, 1, 2],
+        [0, 1, 3],
+        [2, 3, 4],
+    ])
+
+    # Create a triangle mesh
+    arrow_mesh = o3d.geometry.TriangleMesh()
+    arrow_mesh.vertices = o3d.utility.Vector3dVector(vertices)
+    arrow_mesh.triangles = o3d.utility.Vector3iVector(triangles)
+
+    # Translate and rotate the arrow
+    arrow_mesh.translate(point)
+    # rotation_matrix = o3d.geometry.get_rotation_matrix_from_axis_angle([0, 0, 1], np.arctan2(velocity[1], velocity[0]))
+    # rotation_matrix = np.linalg.rotation_matrix(np.arctan2(velocity[1], velocity[0]), [0, 0, 1])
+    rotation_axis = np.array([0, 0, 1])
+    rotation_angle = np.arctan2(velocity[1], velocity[0])
+    rotation_matrix = o3d.geometry.get_rotation_matrix_from_axis_angle(
+        rotation_axis, rotation_angle)
+    arrow_mesh.rotate(rotation_matrix, center=arrow_mesh.get_center())
+
+    return arrow_mesh
+
+
 def visualize_points(points_radar: np.ndarray,
                      x_range,
                      y_range,
@@ -1553,6 +1620,13 @@ def visualize_points(points_radar: np.ndarray,
     colors[:, 1] = 0.0
     colors[:, 2] = 1.0
     pcd_lidar.colors = o3d.utility.Vector3dVector(colors)
+
+    print(type(points_radar[:, 4:6]))
+    # Create a list of arrow meshes
+    arrow_meshes = []
+    for point, velocity in zip(
+            np.asarray(pcd_radar.points), points_radar[:, 4:6]):
+        arrow_meshes.append(create_arrow(point, velocity))
 
     o3d.visualization.draw_geometries(
         [pcd_radar, line_set_grid, pcd_lidar],
