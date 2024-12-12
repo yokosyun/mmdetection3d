@@ -10,10 +10,17 @@ from torch import nn as nn
 
 from mmdet3d.models.layers import SparseBasicBlock, make_sparse_convmodule
 from mmdet3d.models.layers.spconv import IS_SPCONV2_AVAILABLE
+from mmdet3d.models.layers.torchsparse import IS_TORCHSPARSE_AVAILABLE
 from mmdet3d.registry import MODELS
 from mmdet3d.structures import BaseInstance3DBoxes
 
-if IS_SPCONV2_AVAILABLE:
+if IS_TORCHSPARSE_AVAILABLE:
+    from torch.nn import Sequential as SparseSequential
+    from torchsparse import SparseTensor as SparseConvTensor
+    from torchsparse.utils import make_ntuple
+
+    from mmdet3d.models.layers.torchsparse_block import TorchSparseBasicBlock
+elif IS_SPCONV2_AVAILABLE:
     from spconv.pytorch import SparseConvTensor, SparseSequential
 else:
     from mmcv.ops import SparseConvTensor, SparseSequential
@@ -85,30 +92,53 @@ class SparseEncoder(nn.Module):
         assert set(order) == {'conv', 'norm', 'act'}
 
         if self.order[0] != 'conv':  # pre activate
+            if IS_TORCHSPARSE_AVAILABLE:
+                sp_conv_cfg = {'conv_type': 'TorchSparseConv3d'}
+            else:
+                sp_conv_cfg = {
+                    'conv_type': 'SubMConv3d',
+                    'indice_key': 'subm1',
+                    'order': ('conv', )
+                }
             self.conv_input = make_sparse_convmodule(
                 in_channels,
                 self.base_channels,
                 3,
                 norm_cfg=norm_cfg,
                 padding=1,
-                indice_key='subm1',
-                conv_type='SubMConv3d',
-                order=('conv', ))
+                order=('conv', ),
+                **sp_conv_cfg,
+            )
         else:  # post activate
+            if IS_TORCHSPARSE_AVAILABLE:
+                sp_conv_cfg = {'conv_type': 'TorchSparseConv3d'}
+            else:
+                sp_conv_cfg = {
+                    'conv_type': 'SubMConv3d',
+                    'indice_key': 'subm1',
+                }
             self.conv_input = make_sparse_convmodule(
                 in_channels,
                 self.base_channels,
                 3,
                 norm_cfg=norm_cfg,
                 padding=1,
-                indice_key='subm1',
-                conv_type='SubMConv3d')
+                **sp_conv_cfg,
+            )
 
         encoder_out_channels = self.make_encoder_layers(
             make_sparse_convmodule,
             norm_cfg,
             self.base_channels,
             block_type=block_type)
+
+        if IS_TORCHSPARSE_AVAILABLE:
+            sp_conv_cfg = {'conv_type': 'TorchSparseConv3d'}
+        else:
+            sp_conv_cfg = {
+                'conv_type': 'SparseConv3d',
+                'indice_key': 'spconv_down2'
+            }
 
         self.conv_out = make_sparse_convmodule(
             encoder_out_channels,
@@ -117,8 +147,8 @@ class SparseEncoder(nn.Module):
             stride=(2, 1, 1),
             norm_cfg=norm_cfg,
             padding=0,
-            indice_key='spconv_down2',
-            conv_type='SparseConv3d')
+            **sp_conv_cfg,
+        )
 
     @amp.autocast(enabled=False)
     def forward(self, voxel_features: Tensor, coors: Tensor,
@@ -142,8 +172,17 @@ class SparseEncoder(nn.Module):
                 module returns middle features.
         """
         coors = coors.int()
+        if IS_TORCHSPARSE_AVAILABLE:
+            spatial_range = make_ntuple([batch_size, *self.sparse_shape],
+                                        ndim=4)
+            sparse_tensor_cfg = {'spatial_range': spatial_range}
+        else:
+            sparse_tensor_cfg = {
+                'spatial_shape': self.sparse_shape,
+                'batch_size': batch_size,
+            }
         input_sp_tensor = SparseConvTensor(voxel_features, coors,
-                                           self.sparse_shape, batch_size)
+                                           **sparse_tensor_cfg)
         x = self.conv_input(input_sp_tensor)
 
         encode_features = []
@@ -189,6 +228,11 @@ class SparseEncoder(nn.Module):
         assert block_type in ['conv_module', 'basicblock']
         self.encoder_layers = SparseSequential()
 
+        if IS_TORCHSPARSE_AVAILABLE:
+            sparse_conv_type = 'TorchSparseConv3d'
+        else:
+            sparse_conv_type = 'SparseConv3d'
+
         for i, blocks in enumerate(self.encoder_channels):
             blocks_list = []
             for j, out_channels in enumerate(tuple(blocks)):
@@ -205,7 +249,7 @@ class SparseEncoder(nn.Module):
                             stride=2,
                             padding=padding,
                             indice_key=f'spconv{i + 1}',
-                            conv_type='SparseConv3d'))
+                            conv_type=sparse_conv_type))
                 elif block_type == 'basicblock':
                     if j == len(blocks) - 1 and i != len(
                             self.encoder_channels) - 1:
@@ -218,14 +262,22 @@ class SparseEncoder(nn.Module):
                                 stride=2,
                                 padding=padding,
                                 indice_key=f'spconv{i + 1}',
-                                conv_type='SparseConv3d'))
+                                conv_type=sparse_conv_type))
                     else:
-                        blocks_list.append(
-                            SparseBasicBlock(
-                                out_channels,
-                                out_channels,
-                                norm_cfg=norm_cfg,
-                                conv_cfg=conv_cfg))
+                        if IS_TORCHSPARSE_AVAILABLE:
+                            blocks_list.append(
+                                TorchSparseBasicBlock(
+                                    out_channels,
+                                    out_channels,
+                                    norm_cfg=norm_cfg,
+                                ))
+                        else:
+                            blocks_list.append(
+                                SparseBasicBlock(
+                                    out_channels,
+                                    out_channels,
+                                    norm_cfg=norm_cfg,
+                                    conv_cfg=conv_cfg))
                 else:
                     blocks_list.append(
                         make_block(
