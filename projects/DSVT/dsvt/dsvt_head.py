@@ -655,6 +655,7 @@ class DSVTCenterHead(CenterHead):
             pred_iou = torch.clamp(iou_preds, min=0, max=1.0)
             iou_rectifier = pred_iou.new_tensor(
                 self.test_cfg['iou_rectifier'][task_id])
+            cls_labels = torch.clamp(cls_labels, min=0, max=2)
             cls_preds = torch.pow(cls_preds,
                                   1 - iou_rectifier[cls_labels]) * torch.pow(
                                       pred_iou, iou_rectifier[cls_labels])

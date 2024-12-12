@@ -1,12 +1,20 @@
-_base_ = ['../../../configs/_base_/default_runtime.py']
+_base_ = [
+    '../../../configs/_base_/default_runtime.py',
+    '../../../configs/_base_/datasets/nus-3d.py',
+]
 custom_imports = dict(
     imports=['projects.DSVT.dsvt'], allow_failed_imports=False)
 
 voxel_size = [0.32, 0.32, 6]
 grid_size = [468, 468, 1]
 point_cloud_range = [-74.88, -74.88, -2, 74.88, 74.88, 4.0]
-data_root = 'data/waymo/kitti_format/'
-class_names = ['Car', 'Pedestrian', 'Cyclist']
+# data_root = 'data/waymo/kitti_format/'
+data_root = 'data/nuscenes/'
+# class_names = ['Car', 'Pedestrian', 'Cyclist']
+class_names = [
+    'car', 'truck', 'construction_vehicle', 'bus', 'trailer', 'barrier',
+    'motorcycle', 'bicycle', 'pedestrian', 'traffic_cone'
+]
 metainfo = dict(classes=class_names)
 input_modality = dict(use_lidar=True, use_camera=False)
 backend_args = None
@@ -19,7 +27,7 @@ model = dict(
         with_distance=False,
         use_absolute_xyz=True,
         use_norm=True,
-        num_filters=[192, 192],
+        num_filters=[64, 64],
         num_point_features=5,
         voxel_size=voxel_size,
         grid_size=grid_size,
@@ -29,28 +37,27 @@ model = dict(
         input_layer=dict(
             sparse_shape=grid_size,
             downsample_stride=[],
-            dim_model=[192],
-            set_info=[[36, 4]],
+            dim_model=[64],
+            set_info=[[8, 4]],
             window_shape=[[12, 12, 1]],
             hybrid_factor=[2, 2, 1],  # x, y, z
             shift_list=[[[0, 0, 0], [6, 6, 0]]],
             normalize_pos=False),
         set_info=[[36, 4]],
-        dim_model=[192],
+        dim_model=[64],
         dim_feedforward=[384],
         stage_num=1,
         nhead=[8],
-        conv_out_channel=192,
+        conv_out_channel=64,
         output_shape=[468, 468],
         dropout=0.,
         activation='gelu'),
     map2bev=dict(
-        type='PointPillarsScatter3D',
-        output_shape=grid_size,
-        num_bev_feats=192),
+        type='PointPillarsScatter3D', output_shape=grid_size,
+        num_bev_feats=64),
     backbone=dict(
         type='ResSECOND',
-        in_channels=192,
+        in_channels=64,
         out_channels=[128, 128, 256],
         blocks_nums=[1, 2, 2],
         layer_strides=[1, 2, 2]),
@@ -65,7 +72,8 @@ model = dict(
     bbox_head=dict(
         type='DSVTCenterHead',
         in_channels=sum([128, 128, 128]),
-        tasks=[dict(num_class=3, class_names=class_names)],
+        # tasks=[dict(num_class=3, class_names=class_names)],
+        tasks=[dict(num_class=10, class_names=class_names)],
         common_heads=dict(
             reg=(2, 2), height=(1, 2), dim=(3, 2), rot=(2, 2), iou=(1, 2)),
         share_conv_channel=64,
@@ -119,7 +127,8 @@ model = dict(
 
 db_sampler = dict(
     data_root=data_root,
-    info_path=data_root + 'waymo_dbinfos_train.pkl',
+    # info_path=data_root + 'waymo_dbinfos_train.pkl',
+    info_path=data_root + 'nuscenes_dbinfos_train.pkl',
     rate=1.0,
     prepare=dict(
         filter_by_difficulty=[-1],
@@ -129,7 +138,8 @@ db_sampler = dict(
     points_loader=dict(
         type='LoadPointsFromFile',
         coord_type='LIDAR',
-        load_dim=6,
+        # load_dim=6,
+        load_dim=5,
         use_dim=[0, 1, 2, 3, 4],
         norm_intensity=True,
         norm_elongation=True,
@@ -140,7 +150,8 @@ train_pipeline = [
     dict(
         type='LoadPointsFromFile',
         coord_type='LIDAR',
-        load_dim=6,
+        # load_dim=6,
+        load_dim=5,
         use_dim=5,
         norm_intensity=True,
         norm_elongation=True,
@@ -169,7 +180,8 @@ test_pipeline = [
     dict(
         type='LoadPointsFromFile',
         coord_type='LIDAR',
-        load_dim=6,
+        # load_dim=6,
+        load_dim=5,
         use_dim=5,
         norm_intensity=True,
         norm_elongation=True,
@@ -181,7 +193,8 @@ test_pipeline = [
         meta_keys=['box_type_3d', 'sample_idx', 'context_name', 'timestamp'])
 ]
 
-dataset_type = 'WaymoDataset'
+# dataset_type = 'WaymoDataset'
+dataset_type = 'NuScenesDataset'
 train_dataloader = dict(
     batch_size=1,
     num_workers=4,
@@ -190,8 +203,11 @@ train_dataloader = dict(
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
-        ann_file='waymo_infos_train.pkl',
-        data_prefix=dict(pts='training/velodyne', sweeps='training/velodyne'),
+        # ann_file='waymo_infos_train.pkl',
+        ann_file='nuscenes_infos_train.pkl',
+        # data_prefix=dict(pts='training/velodyne', sweeps='training/velodyne'),
+        data_prefix=dict(
+            pts='samples/LIDAR_TOP', img='', sweeps='sweeps/LIDAR_TOP'),
         pipeline=train_pipeline,
         modality=input_modality,
         test_mode=False,
@@ -211,8 +227,11 @@ val_dataloader = dict(
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
-        data_prefix=dict(pts='training/velodyne', sweeps='training/velodyne'),
-        ann_file='waymo_infos_val.pkl',
+        # data_prefix=dict(pts='training/velodyne', sweeps='training/velodyne'),
+        data_prefix=dict(
+            pts='samples/LIDAR_TOP', img='', sweeps='sweeps/LIDAR_TOP'),
+        # ann_file='waymo_infos_val.pkl',
+        ann_file='nuscenes_infos_train.pkl',
         pipeline=test_pipeline,
         modality=input_modality,
         test_mode=True,
@@ -221,11 +240,11 @@ val_dataloader = dict(
         backend_args=backend_args))
 test_dataloader = val_dataloader
 
-val_evaluator = dict(
-    type='WaymoMetric',
-    waymo_bin_file='./data/waymo/waymo_format/gt.bin',
-    result_prefix='./dsvt_pred')
-test_evaluator = val_evaluator
+# val_evaluator = dict(
+#     type='WaymoMetric',
+#     waymo_bin_file='./data/waymo/waymo_format/gt.bin',
+#     result_prefix='./dsvt_pred')
+# test_evaluator = val_evaluator
 
 vis_backends = [dict(type='LocalVisBackend')]
 visualizer = dict(
