@@ -45,8 +45,10 @@ class LiDARPoints(BasePoints):
         assert bev_direction in ('horizontal', 'vertical')
         if bev_direction == 'horizontal':
             self.tensor[:, 1] = -self.tensor[:, 1]
+            self.tensor[:, 5] = -self.tensor[:, 5]  # flip vy
         elif bev_direction == 'vertical':
             self.tensor[:, 0] = -self.tensor[:, 0]
+            self.tensor[:, 4] = -self.tensor[:, 4]  # flip vx
 
     def convert_to(self,
                    dst: int,

@@ -5,14 +5,189 @@ from typing import List, Optional, Union
 import mmcv
 import mmengine
 import numpy as np
+import open3d as o3d
 from mmcv.transforms import LoadImageFromFile
 from mmcv.transforms.base import BaseTransform
 from mmdet.datasets.transforms import LoadAnnotations
 from mmengine.fileio import get
+from nuscenes.utils.data_classes import RadarPointCloud
 
 from mmdet3d.registry import TRANSFORMS
 from mmdet3d.structures.bbox_3d import get_box_type
 from mmdet3d.structures.points import BasePoints, get_points_type
+
+NUM_DIMENSIONS = 2
+
+X_RANGE = [-51.2, 51.2]
+Y_RANGE = [-51.2, 51.2]
+Z_RANGE = [-5, 3]
+VOXEL_RESOLUTIONS = np.array([0.1, 0.1, 0.2])
+
+
+@TRANSFORMS.register_module()
+class LoadRadarPointsFromMultiSweepsV3(object):
+    """Load points from multiple sweeps.
+
+    This is usually used for nuScenes dataset to utilize previous sweeps.
+
+    Args:
+        sweeps_num (int): Number of sweeps. Defaults to 10.
+        load_dim (int): Dimension number of the loaded points. Defaults to 5.
+        use_dim (list[int]): Which dimension to use. Defaults to [0, 1, 2, 4].
+        file_client_args (dict): Config dict of file clients, refer to
+            https://github.com/open-mmlab/mmcv/blob/master/mmcv/fileio/file_client.py
+            for more details. Defaults to dict(backend='disk').
+        pad_empty_sweeps (bool): Whether to repeat keyframe when
+            sweeps is empty. Defaults to False.
+        remove_close (bool): Whether to remove close points.
+            Defaults to False.
+        test_mode (bool): If test_model=True used for testing, it will not
+            randomly sample sweeps but select the nearest N frames.
+            Defaults to False.
+    """
+
+    def __init__(self,
+                 sweeps_num=10,
+                 file_client_args=dict(backend='disk'),
+                 invalid_states=[0],
+                 dynprop_states=range(7),
+                 ambig_states=[3],
+                 pad_empty_sweeps=False,
+                 remove_close=False,
+                 test_mode=False):
+        self.sweeps_num = sweeps_num
+        self.file_client_args = file_client_args.copy()
+        # self.file_client = None
+        self.pad_empty_sweeps = pad_empty_sweeps
+        self.remove_close = remove_close
+        self.test_mode = test_mode
+        self.invalid_states = invalid_states
+        self.dynprop_states = dynprop_states
+        self.ambig_states = ambig_states
+        self.coord_type = 'LIDAR'
+
+    def _load_points(self, pts_filename):
+        """Private function to load point clouds data.
+
+        Args:
+            pts_filename (str): Filename of point clouds data.
+
+        Returns:
+            np.ndarray: An array containing point clouds data.
+        """
+        # if self.file_client is None:
+        #     print("----------------------------------", self.file_client_args)
+        #     self.file_client = mmcv.FileClient(**self.file_client_args)
+        try:
+            # x y z dyn_prop id rcs vx vy vx_comp vy_comp is_quality_valid ambig_state x_rms y_rms invalid_state pdh0 vx_rms vy_rms
+            raw_points = RadarPointCloud.from_file(
+                pts_filename,
+                invalid_states=self.invalid_states,
+                dynprop_states=self.dynprop_states,
+                ambig_states=self.ambig_states).points.T
+            xyz = raw_points[:, :3]
+            rcs = raw_points[:, 5].reshape(-1, 1)
+            vxy_comp = raw_points[:, 8:10]
+            points = np.hstack((xyz, rcs, vxy_comp))
+        except ConnectionError:
+            mmcv.check_file_exist(pts_filename)
+            if pts_filename.endswith('.npy'):
+                points = np.load(pts_filename)
+            else:
+                points = np.fromfile(pts_filename, dtype=np.float32)
+        return points
+
+    def _remove_close(self, points, radius=1.0):
+        """Removes point too close within a certain radius from origin.
+
+        Args:
+            points (np.ndarray | :obj:`BasePoints`): Sweep points.
+            radius (float): Radius below which points are removed.
+                Defaults to 1.0.
+
+        Returns:
+            np.ndarray: Points after removing.
+        """
+        if isinstance(points, np.ndarray):
+            points_numpy = points
+        elif isinstance(points, BasePoints):
+            points_numpy = points.tensor.numpy()
+        else:
+            raise NotImplementedError
+        x_filt = np.abs(points_numpy[:, 0]) < radius
+        y_filt = np.abs(points_numpy[:, 1]) < radius
+        not_close = np.logical_not(np.logical_and(x_filt, y_filt))
+        return points[not_close]
+
+    def __call__(self, results):
+        """Call function to load multi-sweep point clouds from files.
+
+        Args:
+            results (dict): Result dict containing multi-sweep point cloud \
+                filenames.
+
+        Returns:
+            dict: The result dict containing the multi-sweep points data. \
+                Added key and value are described below.
+
+                - points (np.ndarray | :obj:`BasePoints`): Multi-sweep point \
+                    cloud arrays.
+        """
+        sweep_points_list = []
+        if self.pad_empty_sweeps and len(results['radar_sweeps']) == 0:
+            for i in range(self.sweeps_num):
+                if self.remove_close:
+                    sweep_points_list.append(self._remove_close(points))
+                else:
+                    sweep_points_list.append(points)
+        else:
+            num_sweeps = len(results['radar_sweeps'])
+            for idx in range(num_sweeps):
+                sweep_pts_file_name = results['radar_sweeps'][idx]
+                points_sweep = self._load_points(
+                    sweep_pts_file_name)  # x, y, z, RCS, vx_comp, vy_comp
+                # print(points_sweep.shape)
+                if self.remove_close:
+                    points_sweep = self._remove_close(points_sweep)
+                points_sweep[:, :2] += points_sweep[:, 4:6] * results[
+                    'radar_sweeps_time_gap'][idx]  # radial velocity
+                # print(np.max(points_sweep[:, 2]),np.min(points_sweep[:, 2]))
+                R = results['radar_sweeps_r2l_rot'][idx]
+                T = results['radar_sweeps_r2l_trans'][idx]
+                ### create sensor2lidar_rot/tran end ###
+
+                points_sweep[:, :3] = points_sweep[:, :3] @ R
+                # print(np.max(points_sweep[:, 2]),np.min(points_sweep[:, 2])
+                points_sweep[:, 4:6] = points_sweep[:, 4:6] @ R[:2, :2]
+                points_sweep[:, :3] += T  # lidar coordinate radar point clouds
+                # print(points_sweep.shape, results['radar_sweeps_time_gap'][idx])
+                time_gap = np.repeat(results['radar_sweeps_time_gap'][idx],
+                                     points_sweep.shape[0])
+                # print(time_gap[:, None].shape)
+                # print(np.concatenate((points_sweep, time_gap[:, None]), axis=1).shape)
+                points_sweep = np.concatenate(
+                    (points_sweep, time_gap[:, None]), axis=1)
+
+                sweep_points_list.append(points_sweep)
+
+        print(len(sweep_points_list))
+        points = np.concatenate(sweep_points_list)
+        points[:, 2] = 0  # set zero for z-axis
+
+        visualize_points(
+            points.copy(), X_RANGE, Y_RANGE, VOXEL_RESOLUTIONS,
+            results['lidar_points'].tensor.detach().numpy().copy())
+
+        points_class = get_points_type(self.coord_type)
+        points = points_class(
+            points, points_dim=points.shape[-1], attribute_dims=None)
+        results['points'] = points
+
+        return results
+
+    def __repr__(self):
+        """str: Return a string that describes the module."""
+        return f'{self.__class__.__name__}(sweeps_num={self.sweeps_num})'
 
 
 @TRANSFORMS.register_module()
@@ -461,6 +636,7 @@ class LoadPointsFromMultiSweeps(BaseTransform):
         points = points.cat(sweep_points_list)
         points = points[:, self.use_dim]
         results['points'] = points
+
         return results
 
     def __repr__(self) -> str:
@@ -693,7 +869,7 @@ class LoadPointsFromFile(BaseTransform):
         points_class = get_points_type(self.coord_type)
         points = points_class(
             points, points_dim=points.shape[-1], attribute_dims=attribute_dims)
-        results['points'] = points
+        results['lidar_points'] = points
 
         return results
 
@@ -1325,3 +1501,137 @@ class MultiModalityDet3DInferencerLoader(BaseTransform):
         multi_modality_inputs.update(imgs_inputs)
 
         return multi_modality_inputs
+
+
+def get_prallel_lines(x_range, y_range, reolution, is_vertical=False):
+    intervals = np.arange(x_range[0], x_range[1] + reolution, reolution)
+    intervals = np.repeat(intervals, NUM_DIMENSIONS)
+    min_max = np.full_like(intervals, y_range[0])
+    min_max[::NUM_DIMENSIONS] = y_range[1]
+    heights = np.zeros_like(intervals) - 5
+    parallel_lines = np.vstack((intervals, min_max, heights)).T
+    if is_vertical:
+        parallel_lines[:, [1, 0, 2]] = parallel_lines.copy()
+
+    return parallel_lines
+
+
+def gen_grid(x_range, y_range,
+             raster_resolution: np.ndarray) -> o3d.geometry.LineSet:
+
+    horizontal_lines = get_prallel_lines(
+        x_range, y_range, raster_resolution[0], is_vertical=False)
+    vertical_lines = get_prallel_lines(
+        y_range, x_range, raster_resolution[1], is_vertical=True)
+
+    line_set = o3d.geometry.LineSet()
+    points = np.vstack((vertical_lines, horizontal_lines))
+    line_set.points = o3d.utility.Vector3dVector(points)
+    lines = np.arange(points.shape[0]).reshape(-1, NUM_DIMENSIONS)
+    line_set.lines = o3d.utility.Vector2iVector(lines)
+    line_set.paint_uniform_color((0.5, 0.5, 0.5))
+
+    # o3d.visualization.RenderOption.line_width = 0.01
+
+    return line_set
+
+
+# def create_arrow(point, velocity):
+#     arrow = o3d.geometry.create_mesh_arrow(cylinder_radius=0.01, cone_radius=0.02, cylinder_height=0.05, cone_height=0.03)
+#     arrow.scale(np.linalg.norm(velocity), center=(0, 0, 0))
+#     arrow.translate(point)
+#     rotation_matrix = o3d.geometry.get_rotation_matrix_from_axis_angle([0, 0, 1], np.arctan2(velocity[1], velocity[0]))
+#     arrow.rotate(rotation_matrix, center=(0, 0, 0))
+#     return arrow
+
+# def create_arrow(point, velocity):
+#     # Create cylinder for the arrow shaft
+#     cylinder = o3d.geometry.CylinderMesh()
+#     cylinder.cylinder_radius = 0.01
+#     cylinder.cylinder_height = 0.05
+#     cylinder.translate(point)
+
+#     # Create cone for the arrow head
+#     cone = o3d.geometry.ConeMesh()
+#     cone.radius = 0.02
+#     cone.height = 0.03
+#     cone.translate(point + [0, 0, 0.05])
+
+#     # Align the cone with the velocity vector
+#     rotation_matrix = o3d.geometry.get_rotation_matrix_from_axis_angle([0, 0, 1], np.arctan2(velocity[1], velocity[0]))
+#     cone.rotate(rotation_matrix, center=cone.get_center())
+
+#     # Combine the cylinder and cone into a single mesh
+#     arrow_mesh = o3d.geometry.Mesh.merge([cylinder, cone])
+#     return arrow_mesh
+
+
+def create_arrow(point, velocity):
+    # Define vertices and faces for the arrow
+    vertices = np.array([
+        [0, 0, 0],  # Base of the shaft
+        [0, 0, 0.05],  # Top of the shaft
+        [-0.01, -0.01, 0.05],  # Base of the head
+        [0.01, -0.01, 0.05],
+        [0, 0.02, 0.08],  # Tip of the head
+    ])
+
+    triangles = np.array([
+        [0, 1, 2],
+        [0, 1, 3],
+        [2, 3, 4],
+    ])
+
+    # Create a triangle mesh
+    arrow_mesh = o3d.geometry.TriangleMesh()
+    arrow_mesh.vertices = o3d.utility.Vector3dVector(vertices)
+    arrow_mesh.triangles = o3d.utility.Vector3iVector(triangles)
+
+    # Translate and rotate the arrow
+    arrow_mesh.translate(point)
+    # rotation_matrix = o3d.geometry.get_rotation_matrix_from_axis_angle([0, 0, 1], np.arctan2(velocity[1], velocity[0]))
+    # rotation_matrix = np.linalg.rotation_matrix(np.arctan2(velocity[1], velocity[0]), [0, 0, 1])
+    rotation_axis = np.array([0, 0, 1])
+    rotation_angle = np.arctan2(velocity[1], velocity[0])
+    rotation_matrix = o3d.geometry.get_rotation_matrix_from_axis_angle(
+        rotation_axis, rotation_angle)
+    arrow_mesh.rotate(rotation_matrix, center=arrow_mesh.get_center())
+
+    return arrow_mesh
+
+
+def visualize_points(points_radar: np.ndarray,
+                     x_range,
+                     y_range,
+                     voxe_resolutions,
+                     points_lidar=None) -> None:
+    pcd_radar = o3d.geometry.PointCloud()
+    pcd_radar.points = o3d.utility.Vector3dVector(points_radar[:, :3])
+    colors = points_radar[:, [5, 4, 3]]
+    colors[:, 2] = 0  # disable RCS vis
+    pcd_radar.colors = o3d.utility.Vector3dVector(colors)
+    line_set_grid = gen_grid(
+        x_range, y_range, raster_resolution=voxe_resolutions[:2])
+
+    pcd_lidar = o3d.geometry.PointCloud()
+    pcd_lidar.points = o3d.utility.Vector3dVector(points_lidar[:, :3])
+    colors = points_lidar[:, :3].copy()
+    colors[:, 0] = 0.0
+    colors[:, 1] = 0.0
+    colors[:, 2] = 1.0
+    pcd_lidar.colors = o3d.utility.Vector3dVector(colors)
+
+    print(type(points_radar[:, 4:6]))
+    # Create a list of arrow meshes
+    arrow_meshes = []
+    for point, velocity in zip(
+            np.asarray(pcd_radar.points), points_radar[:, 4:6]):
+        arrow_meshes.append(create_arrow(point, velocity))
+
+    o3d.visualization.draw_geometries(
+        [pcd_radar, line_set_grid, pcd_lidar],
+        zoom=0.3412,
+        front=[0.4257, -0.2125, -0.8795],
+        lookat=[2.6172, 2.0475, 1.532],
+        up=[-0.0694, -0.9768, 0.2024],
+    )

@@ -483,7 +483,8 @@ class FlatFormer(nn.Module):
             voxels = voxel_feat[batch_mask, :]  # [n, c]
             voxels = voxels.t()  # [c, n]
 
-            canvas[:, indices] = voxels
+            canvas[:,
+                   indices] = voxels  # += is working properly. but no improvement
             batch_canvas.append(canvas)
 
         batch_canvas = torch.stack(batch_canvas, 0)
