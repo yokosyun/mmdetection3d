@@ -1,4 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import time
 from typing import Dict, List, Optional, Sequence
 
 from torch import Tensor
@@ -45,12 +46,33 @@ class DynamicMVXFasterRCNN(MVXTwoStageDetector):
         """
         if not self.with_pts_bbox:
             return None
+        start_time = time.time()
         voxel_features, feature_coors = self.pts_voxel_encoder(
             voxel_dict['voxels'], voxel_dict['coors'], points, img_feats,
             batch_input_metas)
+        end_time = time.time()
+        elapsed = (end_time - start_time) * 1000
+        print(f'pts_voxel_encoder ={elapsed:.3f}[ms]')
+
         batch_size = voxel_dict['coors'][-1, 0] + 1
+
+        start_time = time.time()
         x = self.pts_middle_encoder(voxel_features, feature_coors, batch_size)
+        end_time = time.time()
+        elapsed = (end_time - start_time) * 1000
+        print(f'pts_middle_encoder ={elapsed:.3f}[ms]')
+
+        start_time = time.time()
         x = self.pts_backbone(x)
+        end_time = time.time()
+        elapsed = (end_time - start_time) * 1000
+        print(f'pts_backbone ={elapsed:.3f}[ms]')
+
+        start_time = time.time()
         if self.with_pts_neck:
             x = self.pts_neck(x)
+        end_time = time.time()
+        elapsed = (end_time - start_time) * 1000
+        print(f'pts_neck ={elapsed:.3f}[ms]')
+
         return x
