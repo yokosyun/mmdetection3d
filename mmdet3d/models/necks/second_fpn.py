@@ -53,12 +53,14 @@ class SECONDFPN(BaseModule):
         for i, out_channel in enumerate(out_channels):
             stride = upsample_strides[i]
             if stride > 1 or (stride == 1 and not use_conv_for_no_stride):
-                upsample_layer = build_upsample_layer(
-                    upsample_cfg,
+                upsample_cfg.pop('type')
+                upsample_layer = nn.ConvTranspose2d(
                     in_channels=in_channels[i],
                     out_channels=out_channel,
                     kernel_size=upsample_strides[i],
-                    stride=upsample_strides[i])
+                    stride=upsample_strides[i],
+                    **upsample_cfg,
+                )
             else:
                 stride = np.round(1 / stride).astype(np.int64)
                 upsample_layer = build_conv_layer(
