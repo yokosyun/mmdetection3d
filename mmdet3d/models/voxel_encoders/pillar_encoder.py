@@ -155,6 +155,30 @@ class PillarFeatureNet(nn.Module):
         mask = torch.unsqueeze(mask, -1).type_as(features)
         features *= mask
 
+        features[:, :, 0] = features[:, :, 0] / 51.2
+        features[:, :, 1] = features[:, :, 1] / 51.2
+        features[:, :, 2] = (features[:, :, 2] + 1.0) / 4.0
+        features[:, :, 3] = (features[:, :, 3] - 128) / 128.0
+
+        # features[:,:,4] = features[:,:,4] / max_time_diff
+
+        features[:, :, 5] = features[:, :, 5] / self.vx
+        features[:, :, 6] = features[:, :, 6] / self.vy
+        features[:, :, 7] = features[:, :, 7] / self.vz
+
+        features[:, :, 8] = features[:, :, 8] / (self.vx / 2)
+        features[:, :, 9] = features[:, :, 9] / (self.vy / 2)
+        features[:, :, 10] = features[:, :, 10] / (self.vz / 2)
+
+        # print(features.shape, self._with_cluster_center, self._with_voxel_center, self.legacy)
+        # print(self.vx, self.vy, self.vz)
+        # print(torch.max(features.reshape(-1,11), dim=0))
+        # print(torch.min(features.reshape(-1,11), dim=0))
+        # print(torch.max(features), torch.min(features))
+
+        # The feature decorations were calculated without regard to whether
+        # pillar was empty. Need to ensure that
+        # empty pillars remain set to zeros.
         for pfn in self.pfn_layers:
             features = pfn(features, num_points)
 
