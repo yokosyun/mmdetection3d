@@ -52,7 +52,7 @@ class SECOND(BaseModule):
                     stride=layer_strides[i],
                     padding=1),
                 build_norm_layer(norm_cfg, out_channels[i])[1],
-                nn.ReLU(inplace=True),
+                nn.ReLU6(inplace=True),
             ]
             for j in range(layer_num):
                 block.append(
@@ -63,7 +63,7 @@ class SECOND(BaseModule):
                         3,
                         padding=1))
                 block.append(build_norm_layer(norm_cfg, out_channels[i])[1])
-                block.append(nn.ReLU(inplace=True))
+                block.append(nn.ReLU6(inplace=True))
 
             block = nn.Sequential(*block)
             blocks.append(block)
