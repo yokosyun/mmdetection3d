@@ -19,6 +19,7 @@ def get_paddings_indicator(actual_num: Tensor,
     Returns:
         torch.Tensor: Mask indicates which points are valid inside a voxel.
     """
+
     actual_num = torch.unsqueeze(actual_num, axis + 1)
     # tiled_actual_num: [N, M, 1]
     max_num_shape = [1] * len(actual_num.shape)

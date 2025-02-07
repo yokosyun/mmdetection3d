@@ -89,7 +89,79 @@ class SECOND(BaseModule):
             tuple[torch.Tensor]: Multi-scale features.
         """
         outs = []
+
+        # print(torch.max(x))
+        # x[:,28,:,:] /= 10.0
+        # x[:,62,:,:] /= 10.0
+        # x[:,12,:,:] /= 10.0
+        # x[:,19,:,:] /= 10.0
+        # x[:,6,:,:] /= 10.0
+
+        # if True:
+        #     vis(x)
+
+        # for i in range(len(self.blocks)):
+        #     x = self.blocks[i](x)
+        #     outs.append(x)
+        # return tuple(outs)
+        # high_vals = [
+        #     [28, 62, 12, 19,  6], # [28, 12, 19, 62, 21]
+        #     [44, 24, 51, 19, 4], # [35,  5, 19, 24, 43] [ 5, 19, 24, 48, 44]
+        #     [12, 50, 11, 26, 41],# [12, 50, 11, 26, 15] [12, 50, 15, 11,  9]
+        #     [3, 10, 28, 15, 33], # [ 3,  4, 28,  0, 10] [ 3, 28,  0, 17,  4]
+        # ]
+
         for i in range(len(self.blocks)):
-            x = self.blocks[i](x)
+            for layer_idx, block in enumerate(self.blocks[i]):
+                if type(block).__name__ == 'QuantConv2d' and i == 0:
+                    vis(x, str(i) + '.' + str(layer_idx))
+                x = block(x)
             outs.append(x)
         return tuple(outs)
+
+
+def vis(x, layer_name):
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import torch
+
+    N, C, H, W = x.shape
+    x_c_hw = x.reshape(C, H * W)
+    mask = x_c_hw.abs().sum(0) != 0.0
+    x_c_hw = x_c_hw[:, mask]
+
+    if True:
+        max_vals = torch.max(x_c_hw, dim=1).values
+        topk = torch.topk(max_vals, 32)
+        # print(topk)
+        # indices = [28, 62, 12, 19,  6]
+        indices = topk.indices
+        # print(indices)
+        # indices = [35, 58,  1, 20, 25, 50, 38, 14, 41, 27, 11,  0] # xy
+        # indices = [32, 60,  2, 57, 63, 17, 21, 36, 16, 29, 61,  5] # center_x, center_y
+        # indices = [60, 36, 16,  5, 29,  9, 31, 15, 28,  7, 58, 2] # time
+        indices = [60, 56, 26, 24, 19, 5, 32, 15, 12, 61, 59, 57]
+        x_c_hw = x_c_hw[indices]
+    if True:
+        max_vals = torch.max(x_c_hw, dim=0).values
+        sorted_vals, sorted_idx = torch.sort(max_vals, descending=True)
+        x_c_hw = x_c_hw[:, sorted_idx]
+        x_c_hw = x_c_hw[:, ::20]
+
+    C, HW = x_c_hw.shape
+
+    X, Y = np.meshgrid(np.arange(HW), np.arange(C))
+    z = np.abs(x_c_hw.cpu().numpy()).flatten()
+    cmap = plt.cm.get_cmap('coolwarm')
+
+    colors = cmap(z / np.max(z))
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    ax.bar3d(X.flatten(), Y.flatten(), np.zeros_like(z), 1, 1, z, color=colors)
+    ax.set_xlabel('BEV Grids')
+    ax.set_ylabel('Input Channel')
+    ax.set_zlabel('Absolute Input Activation Value')
+    ax.set_title(layer_name)
+    plt.show()
