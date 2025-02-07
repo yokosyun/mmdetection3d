@@ -376,61 +376,65 @@ def main():
                     'axis': 0
                 },
                 'pts_backbone.blocks.0*weight_quantizer': {
-                    'enable': True,
+                    'enable': False,
                     'num_bits': 8,
                     'axis': 0
                 },
                 'pts_backbone.blocks.1*weight_quantizer': {
-                    'enable': True,
+                    'enable': False,
                     'num_bits': 8,
                     'axis': 0
                 },
                 'pts_backbone.blocks.2*weight_quantizer': {
-                    'enable': True,
+                    'enable': False,
                     'num_bits': 8,
                     'axis': 0
                 },
                 'pts_neck.*weight_quantizer': {
-                    'enable': True,
+                    'enable': False,
                     'num_bits': 8,
                     'axis': 0
                 },
                 'pts_bbox_head.*weight_quantizer': {
-                    'enable': True,
+                    'enable': False,
                     'num_bits': 8,
                     'axis': 0
                 },
 
-                # "*weight_quantizer": {"enable": True, "num_bits": 8, "axis": None, "calibrator": "max"},
-                # "*input_quantizer": {"enable": True, "num_bits": 8, "axis": None, "calibrator": "histogram"},
+                # "*weight_quantizer": {"enable": True, "num_bits": 8, "axis": 0, "calibrator": "max"},
+                # "*input_quantizer": {"enable": False, "num_bits": 8, "axis": None, "calibrator": "max"},
                 'pts_voxel_encoder*input_quantizer': {
-                    'enable': True,
+                    'enable': False,
                     'num_bits': 8,
-                    'axis': None
+                    'axis': None,
                 },
                 'pts_backbone.blocks.0.0*input_quantizer': {
                     'enable': True,
                     'num_bits': 8,
                     'axis': None,
-                    'calibrator': 'max'
+                    # 'calibrator': 'max',
+                    # "unsigned": True,
                 },
                 'pts_backbone.blocks.0.3*input_quantizer': {
-                    'enable': False,
+                    'enable': True,
                     'num_bits': 8,
                     'axis': None,
-                    'calibrator': 'max'
+                    # 'calibrator': 'max',
+                    # "unsigned": True,
                 },
                 'pts_backbone.blocks.0.6*input_quantizer': {
-                    'enable': False,
+                    'enable': True,
                     'num_bits': 8,
                     'axis': None,
-                    'calibrator': 'max'
+                    # 'calibrator': 'max',
+                    # "unsigned": True,
                 },
                 'pts_backbone.blocks.0.9*input_quantizer': {
-                    'enable': False,
+                    'enable': True,
                     'num_bits': 8,
                     'axis': None,
-                    'calibrator': 'max'
+                    # 'calibrator': 'max',
+                    # "unsigned": True,
                 },
                 'pts_backbone.blocks.1*input_quantizer': {
                     'enable': True,
@@ -448,7 +452,7 @@ def main():
                     'axis': None
                 },
                 'pts_bbox_head.*input_quantizer': {
-                    'enable': True,
+                    'enable': False,
                     'num_bits': 8,
                     'axis': None
                 },
@@ -462,7 +466,7 @@ def main():
                 # "default": {"enable": False},
             },
             'algorithm':
-            'max',  # ["max", "smoothquant", "awq_lite", "awq_clip", "awq_full", "real_quantize"]
+            'smoothquant',  # ["max", "smoothquant", "awq_lite", "awq_clip", "awq_full", "real_quantize"]
         }
         import modelopt
         from modelopt.torch.opt import apply_mode
@@ -600,116 +604,6 @@ def main():
             )
             print(f'Saved pts_backbone_neck_head onnx model:'
                   f' {pth_onnx_backbone_neck_head}')
-
-    else:
-        import torch.ao.quantization as quant
-        from torch.ao.quantization.observer import (HistogramObserver,
-                                                    MinMaxObserver)
-        from torch.ao.quantization.qconfig import QConfig
-
-        qconfig = QConfig(
-            activation=HistogramObserver.with_args(dtype=torch.qint8),
-            # activation=MinMaxObserver.with_args(dtype=torch.qint8),
-            weight=HistogramObserver.with_args(dtype=torch.qint8),
-        )
-
-        runner.model.qconfig = qconfig
-
-        # disable quantization for output
-        for idx in range(6):
-            runner.model.pts_bbox_head.task_heads[idx].dim[1].qconfig = None
-            runner.model.pts_bbox_head.task_heads[idx].heatmap[
-                1].qconfig = None
-            runner.model.pts_bbox_head.task_heads[idx].height[1].qconfig = None
-            runner.model.pts_bbox_head.task_heads[idx].reg[1].qconfig = None
-            runner.model.pts_bbox_head.task_heads[idx].rot[1].qconfig = None
-            runner.model.pts_bbox_head.task_heads[idx].vel[1].qconfig = None
-
-        runner.model = quant.prepare(runner.model)
-
-        runner.val_loop.run()
-
-        vis_hist = True
-
-        if vis_hist:
-            layer_names = []
-            min_values = []
-            max_values = []
-
-            os.makedirs('outputs/', exist_ok=True)
-            for name, module in runner.model.named_modules():
-                # print(name, module)
-                if isinstance(module,
-                              torch.ao.quantization.observer.MinMaxObserver):
-                    layer_names.append(name)
-                    min_values.append(module.min_val.item())
-                    max_values.append(module.max_val.item())
-                elif isinstance(
-                        module,
-                        torch.ao.quantization.observer.HistogramObserver):
-                    name = name.replace('.activation_post_process', '')
-                    name = name.replace('pts_voxel_encoder', 'b')
-                    name = name.replace('pts_backbone', 'b')
-                    name = name.replace('pts_neck', 'n')
-                    name = name.replace('pts_bbox_head.shared_conv', 'h.s')
-                    name = name.replace('pts_bbox_head.task_heads', 'h.t')
-
-                    layer_names.append(name)
-                    max_val = module.max_val.item()
-                    min_val = module.min_val.item()
-                    min_values.append(min_val)
-                    max_values.append(max_val)
-
-                    percentile_99 = get_99th_percentile_from_histogram_observer(
-                        module)
-
-                    step = (max_val - min_val) / module.bins
-                    bins = torch.arange(min_val, max_val, step)
-                    hist = module.histogram
-                    if abs(min_val) < 1e-4:
-                        bins = bins[1:]
-                        hist = hist[1:]
-
-                    plt.figure()
-                    plt.plot(
-                        bins.cpu(),
-                        hist.cpu(),
-                        '--',
-                        linewidth=2,
-                        markersize=2)
-                    plt.xlabel('Value')
-                    plt.ylabel('Frequency')
-                    # plt.yscale('log')
-                    plt.title('Histogram: ' + name)
-                    plt.axvline(
-                        x=percentile_99.cpu(),
-                        color='r',
-                        linestyle='--',
-                        label='99th Percentile')
-                    os.makedirs('outputs/hist/', exist_ok=True)
-                    plt.savefig('outputs/hist/' + name + '.jpg')
-
-            # plt.figure()
-            plt.figure(figsize=(12, 6))
-            plt.vlines(layer_names, min_values, max_values)
-            plt.xlabel('Layer Name')
-            plt.ylabel('Value Range')
-            plt.title('Min and Max Values per Layer (Quantization)')
-            # plt.xticks(rotation=45, ha="right")
-            plt.xticks(rotation=60, ha='right', fontsize=6.0)
-            plt.tight_layout()
-            plt.legend()
-            plt.tight_layout()
-            plt.savefig('outputs/hist/a.min_max_act.jpg')
-        else:
-            # runner.model = torch.ao.quantization.convert(runner.model)
-            # runner.model.cpu()
-            # print(runner.model)
-            # self._test_loop = self.build_test_loop(self._test_loop)  # type: ignore
-
-            # self.call_hook('before_run')
-            runner.test_loop.run()
-
     # else:
     #     runner.test()
 
