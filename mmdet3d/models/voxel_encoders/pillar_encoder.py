@@ -162,6 +162,139 @@ class PillarFeatureNet(nn.Module):
 
 
 @MODELS.register_module()
+class BEV_HEIGHT_Encoder(nn.Module):
+    """Pillar Feature Net.
+
+    The network prepares the pillar features and performs forward pass
+    through PFNLayers.
+
+    Args:
+        in_channels (int, optional): Number of input features,
+            either x, y, z or x, y, z, r. Defaults to 4.
+        feat_channels (tuple, optional): Number of features in each of the
+            N PFNLayers. Defaults to (64, ).
+        with_distance (bool, optional): Whether to include Euclidean distance
+            to points. Defaults to False.
+        with_cluster_center (bool, optional): [description]. Defaults to True.
+        with_voxel_center (bool, optional): [description]. Defaults to True.
+        voxel_size (tuple[float], optional): Size of voxels, only utilize x
+            and y size. Defaults to (0.2, 0.2, 4).
+        point_cloud_range (tuple[float], optional): Point cloud range, only
+            utilizes x and y min. Defaults to (0, -40, -3, 70.4, 40, 1).
+        norm_cfg ([type], optional): [description].
+            Defaults to dict(type='BN1d', eps=1e-3, momentum=0.01).
+        mode (str, optional): The mode to gather point features. Options are
+            'max' or 'avg'. Defaults to 'max'.
+        legacy (bool, optional): Whether to use the new behavior or
+            the original behavior. Defaults to True.
+    """
+
+    def __init__(self,
+                 in_channels: Optional[int] = 4,
+                 feat_channels: Optional[tuple] = (64, ),
+                 with_distance: Optional[bool] = False,
+                 with_cluster_center: Optional[bool] = True,
+                 with_voxel_center: Optional[bool] = True,
+                 voxel_size: Optional[Tuple[float]] = (0.2, 0.2, 4),
+                 point_cloud_range: Optional[Tuple[float]] = (0, -40, -3, 70.4,
+                                                              40, 1),
+                 norm_cfg: Optional[dict] = dict(
+                     type='BN1d', eps=1e-3, momentum=0.01),
+                 mode: Optional[str] = 'max',
+                 legacy: Optional[bool] = True):
+        super(BEV_HEIGHT_Encoder, self).__init__()
+        assert len(feat_channels) > 0
+        self.legacy = legacy
+        if with_cluster_center:
+            in_channels += 3
+        if with_voxel_center:
+            in_channels += 3
+        if with_distance:
+            in_channels += 1
+        self._with_distance = with_distance
+        self._with_cluster_center = with_cluster_center
+        self._with_voxel_center = with_voxel_center
+        # Create PillarFeatureNet layers
+        self.in_channels = in_channels
+        feat_channels = [in_channels] + list(feat_channels)
+        pfn_layers = []
+        for i in range(len(feat_channels) - 1):
+            in_filters = feat_channels[i]
+            out_filters = feat_channels[i + 1]
+            if i < len(feat_channels) - 2:
+                last_layer = False
+            else:
+                last_layer = True
+            pfn_layers.append(
+                PFNLayer(
+                    in_filters,
+                    out_filters,
+                    norm_cfg=norm_cfg,
+                    last_layer=last_layer,
+                    mode=mode))
+        self.pfn_layers = nn.ModuleList(pfn_layers)
+
+        # Need pillar (voxel) size and x/y offset in order to calculate offset
+        self.vx = voxel_size[0]
+        self.vy = voxel_size[1]
+        self.vz = voxel_size[2]
+        self.voxel_size = torch.tensor(voxel_size)
+        self.point_cloud_range = torch.tensor(point_cloud_range)
+
+        self.num_voxel = (self.point_cloud_range[3:] -
+                          self.point_cloud_range[:3]) / self.voxel_size
+
+        self.num_voxel = self.num_voxel.int().tolist()
+        self.voxel_size = self.voxel_size.cuda()
+        self.point_cloud_range = self.point_cloud_range.cuda()
+
+        self.linear = torch.nn.Conv2d(40, 64, kernel_size=1, bias=False)
+        self.norm = torch.nn.BatchNorm2d(64)
+
+    def forward(self, batch_points: Tensor) -> Tensor:
+        """Forward function.
+
+        Args:
+            features (torch.Tensor): Point features or raw points in shape
+                (N, M, C).
+            num_points (torch.Tensor): Number of points in each pillar.
+            coors (torch.Tensor): Coordinates of each voxel.
+
+        Returns:
+            torch.Tensor: Features of pillars.
+        """
+        N = len(batch_points)
+
+        # NZYX
+        bev_height_map = torch.zeros(
+            N,
+            self.num_voxel[2],
+            self.num_voxel[1],
+            self.num_voxel[0],
+            device='cuda')
+        for b_idx, points in enumerate(batch_points):
+
+            valid_pnts = torch.all(
+                points[:, :3] > self.point_cloud_range[:3], dim=1) * torch.all(
+                    points[:, :3] < (self.point_cloud_range[3:] -
+                                     torch.finfo(torch.float16).eps),
+                    dim=1)
+            points = points[valid_pnts]
+
+            xyz_idx = (points[:, :3] -
+                       self.point_cloud_range[:3]) // self.voxel_size
+            xyz_idx = xyz_idx.int()
+
+            bev_height_map[b_idx, xyz_idx[:, 2], xyz_idx[:, 1],
+                           xyz_idx[:, 0]] = 1.0
+
+        bev_feat = self.linear(bev_height_map)
+        bev_feat = self.norm(bev_feat)
+
+        return bev_feat
+
+
+@MODELS.register_module()
 class DynamicPillarFeatureNet(PillarFeatureNet):
     """Pillar Feature Net using dynamic voxelization.
 
