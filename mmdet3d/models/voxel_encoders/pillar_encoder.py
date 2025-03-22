@@ -147,17 +147,46 @@ class PillarFeatureNet(nn.Module):
 
         # Combine together feature decorations
         features = torch.cat(features_ls, dim=-1)
+
+        # print(torch.max(features[:,:,1]), torch.min(features[:,:,1]))
+        # features[:,:,1] = torch.sign(features[:,:,1]) * torch.log2(torch.abs(features[:,:,1]) + 1)
+        # features[:,:,1] = torch.nn.functional.relu(features[:,:,1])
+        # print(torch.max(features[:,:,1]), torch.min(features[:,:,1]))
+
+        features[:, :, 0] = 0  # 35 pos. 58 nega  :27
+        features[:, :, 1] = 0  # 12: pos, 20: nega  :38
+        # xy: =
+        features[:, :,
+                 2] = 0  # z: this feature produce largest outlier to channel 12
+        features[:, :,
+                 3] = 0  # intensity: this feature produce largest outlier to channel 62
+        features[:, :, 4] = 0  # time: very low contribution: C=60,36,16
+        features[:, :, 5] = 0  # cluster_x: no performance effect: C=17
+        features[:, :, 6] = 0  # cluster_y: no performance effect: C=63
+        # cls_x + cls_y: 57, 32, 61
+        features[:, :,
+                 7] = 0  # cluster_z: this feature produce largest outlier to channel 28
+
+        # cz = features[:,:,7]
+        # print(torch.max(features[:,:,7]), torch.min(features[:,:,7]))
+        # features[:,:,7] = torch.sign(cz) * torch.log2(torch.abs(cz) + 1)
+        # print(torch.max(features[:,:,7]), torch.min(features[:,:,7]))
+
+        features[:, :, 8] = 0  # center_x: no performance effect: C=63
+        features[:, :, 9] = 0  # center_y: no performance effect: C=17
+        features[:, :, 10] = 0  # center_z: C=60,
+
         # The feature decorations were calculated without regard to whether
         # pillar was empty. Need to ensure that
         # empty pillars remain set to zeros.
         voxel_count = features.shape[1]
         mask = get_paddings_indicator(num_points, voxel_count, axis=0)
         mask = torch.unsqueeze(mask, -1).type_as(features)
+
         features *= mask
 
         for pfn in self.pfn_layers:
             features = pfn(features, num_points)
-
         return features.squeeze(1)
 
 
