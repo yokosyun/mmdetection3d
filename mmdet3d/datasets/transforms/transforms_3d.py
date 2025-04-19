@@ -257,6 +257,100 @@ class RandomFlip3D(RandomFlip):
 
 
 @TRANSFORMS.register_module()
+class RadarRCSJitter(BaseTransform):
+
+    def __init__(
+        self,
+        jitter_std: float = 0.05,
+        clip_range: List[float] = [-0.05, 0.05],
+        prob: float = 0.5,
+    ) -> None:
+        super(RadarRCSJitter, self).__init__()
+        self.jitter_std = jitter_std
+        self.prob = prob
+        self.clip_range = clip_range
+
+    def transform(self, input_dict: dict) -> dict:
+        points = input_dict['points']
+
+        if random.random() < self.prob:
+            jitter_std = np.array(self.jitter_std, dtype=np.float32)
+            jitter_noise = np.random.randn(points.shape[0]) * jitter_std
+            if self.clip_range is not None:
+                jitter_noise = np.clip(jitter_noise, self.clip_range[0],
+                                       self.clip_range[1])
+
+            RCS_IDX = 3
+            points.tensor[:, RCS_IDX] = 10**(points.tensor[:, RCS_IDX] / 10)
+            points.tensor[:, RCS_IDX] += jitter_noise
+            points.tensor[:, RCS_IDX] = torch.clip(
+                points.tensor[:, RCS_IDX], min=0.1)
+            points.tensor[:, RCS_IDX] = 10 * (
+                np.log10(points.tensor[:, RCS_IDX]))
+
+        return input_dict
+
+
+@TRANSFORMS.register_module()
+class RadarVelociyJitter(BaseTransform):
+
+    def __init__(
+        self,
+        jitter_std: float = [0.05, 0.05],
+        clip_range: List[float] = [-0.05, 0.05],
+        prob: float = 0.5,
+    ) -> None:
+        super(RadarVelociyJitter, self).__init__()
+        self.jitter_std = jitter_std
+        self.prob = prob
+        self.clip_range = clip_range
+
+    def transform(self, input_dict: dict) -> dict:
+        points = input_dict['points']
+
+        if random.random() < self.prob:
+            jitter_std = np.array(self.jitter_std, dtype=np.float32)
+            jitter_noise = np.random.randn(points.shape[0],
+                                           2) * jitter_std[None, :]
+            if self.clip_range is not None:
+                jitter_noise = np.clip(jitter_noise, self.clip_range[0],
+                                       self.clip_range[1])
+
+            points.tensor[:, 4:6] += jitter_noise
+
+        return input_dict
+
+
+@TRANSFORMS.register_module()
+class RadarXYZJitter(BaseTransform):
+
+    def __init__(
+        self,
+        jitter_std: float = [0.05, 0.05, 0],
+        clip_range: List[float] = [-0.05, 0.05],
+        prob: float = 0.5,
+    ) -> None:
+        super(RadarXYZJitter, self).__init__()
+        self.jitter_std = jitter_std
+        self.prob = prob
+        self.clip_range = clip_range
+
+    def transform(self, input_dict: dict) -> dict:
+        points = input_dict['points']
+
+        if random.random() < self.prob:
+            jitter_std = np.array(self.jitter_std, dtype=np.float32)
+            jitter_noise = np.random.randn(points.shape[0],
+                                           3) * jitter_std[None, :]
+            if self.clip_range is not None:
+                jitter_noise = np.clip(jitter_noise, self.clip_range[0],
+                                       self.clip_range[1])
+            points.tensor[:, :3] += jitter_noise
+
+        return input_dict
+
+
+@TRANSFORMS.register_module()
 class RandomJitterPoints(BaseTransform):
     """Randomly jitter point coordinates.
 

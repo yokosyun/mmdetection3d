@@ -80,7 +80,7 @@ def create_nuscenes_infos(root_path,
         print('train scene: {}, val scene: {}'.format(
             len(train_scenes), len(val_scenes)))
     train_nusc_infos, val_nusc_infos = _fill_trainval_infos(
-        nusc, train_scenes, val_scenes, test, max_sweeps=max_sweeps)
+        nusc, train_scenes, val_scenes, root_path, test, max_sweeps=max_sweeps)
 
     metadata = dict(version=version)
     if test:
@@ -92,6 +92,7 @@ def create_nuscenes_infos(root_path,
     else:
         print('train sample: {}, val sample: {}'.format(
             len(train_nusc_infos), len(val_nusc_infos)))
+
         data = dict(infos=train_nusc_infos, metadata=metadata)
         info_path = osp.join(root_path,
                              '{}_infos_train.pkl'.format(info_prefix))
@@ -146,6 +147,7 @@ def get_available_scenes(nusc):
 def _fill_trainval_infos(nusc,
                          train_scenes,
                          val_scenes,
+                         root_path,
                          test=False,
                          max_sweeps=10):
     """Generate the train/val infos from the raw data.
@@ -165,6 +167,7 @@ def _fill_trainval_infos(nusc,
     train_nusc_infos = []
     val_nusc_infos = []
 
+    frame_idx = 0
     for sample in mmengine.track_iter_progress(nusc.sample):
         lidar_token = sample['data']['LIDAR_TOP']
         sd_rec = nusc.get('sample_data', sample['data']['LIDAR_TOP'])
@@ -173,20 +176,50 @@ def _fill_trainval_infos(nusc,
         pose_record = nusc.get('ego_pose', sd_rec['ego_pose_token'])
         lidar_path, boxes, _ = nusc.get_sample_data(lidar_token)
 
+        # radar path
+        radar_f_token = sample['data']['RADAR_FRONT']
+        radar_fr_token = sample['data']['RADAR_FRONT_RIGHT']
+        radar_fl_token = sample['data']['RADAR_FRONT_LEFT']
+        radar_bl_token = sample['data']['RADAR_BACK_LEFT']
+        radar_br_token = sample['data']['RADAR_BACK_RIGHT']
+        radar_f_path, _, _ = nusc.get_sample_data(radar_f_token)
+        radar_fr_path, _, _ = nusc.get_sample_data(radar_fr_token)
+        radar_fl_path, _, _ = nusc.get_sample_data(radar_fl_token)
+        radar_bl_path, _, _ = nusc.get_sample_data(radar_bl_token)
+        radar_br_path, _, _ = nusc.get_sample_data(radar_br_token)
+        radar_path = [
+            radar_f_path, radar_fr_path, radar_fl_path, radar_bl_path,
+            radar_br_path
+        ]
+
         mmengine.check_file_exist(lidar_path)
 
         info = {
             'lidar_path': lidar_path,
+            'radar_path': radar_path,
             'num_features': 5,
             'token': sample['token'],
+            'prev': sample['prev'],
+            'next': sample['next'],
+            'frame_idx': frame_idx,
             'sweeps': [],
+            'radar_sweeps': [],
             'cams': dict(),
+            'radars': dict(),
+            'scene_token': sample['scene_token'],
             'lidar2ego_translation': cs_record['translation'],
             'lidar2ego_rotation': cs_record['rotation'],
             'ego2global_translation': pose_record['translation'],
             'ego2global_rotation': pose_record['rotation'],
             'timestamp': sample['timestamp'],
+            'radar_timestamp': dict(),
         }
+        make_multisweep_radar_data(nusc, sample, max_sweeps, root_path, info)
+
+        if sample['next'] == '':
+            frame_idx = 0
+        else:
+            frame_idx += 1
 
         l2e_r = info['lidar2ego_rotation']
         l2e_t = info['lidar2ego_translation']
@@ -278,6 +311,109 @@ def _fill_trainval_infos(nusc,
             val_nusc_infos.append(info)
 
     return train_nusc_infos, val_nusc_infos
+
+
+def make_multisweep_radar_data(nusc, sample, max_sweeps, root_path, info):
+    from nuscenes.utils.data_classes import RadarPointCloud
+    from nuscenes.utils.geometry_utils import transform_matrix
+    from pyquaternion import Quaternion
+
+    ###########
+    invalid_states = [0, 4, 8, 9, 10, 11, 12, 15, 16]
+    dynprop_states = range(7)
+    ambig_states = [1, 2, 3, 4]
+    radar_sweeps = []
+    radar_sweeps_r2l_rot = []
+    radar_sweeps_r2l_trans = []
+    time_gaps = []
+    ###########
+
+    all_pc = np.zeros((0, 6))
+    # lidar information at sample time
+    lidar_token = sample['data']['LIDAR_TOP']
+    ref_sd_rec = nusc.get('sample_data', sample['data']['LIDAR_TOP'])
+    ref_cs_record = nusc.get('calibrated_sensor',
+                             ref_sd_rec['calibrated_sensor_token'])
+    ref_pose_record = nusc.get('ego_pose', ref_sd_rec['ego_pose_token'])
+
+    # lidar transformation matrix information
+    l2e_r = ref_cs_record['rotation']
+    l2e_t = ref_cs_record['translation']
+    e2g_r = ref_pose_record['rotation']
+    e2g_t = ref_pose_record['translation']
+    l2e_r_mat = Quaternion(l2e_r).rotation_matrix
+    e2g_r_mat = Quaternion(e2g_r).rotation_matrix
+
+    # Directions of radar data
+    radar_channels = [
+        'RADAR_FRONT', 'RADAR_FRONT_RIGHT', 'RADAR_FRONT_LEFT',
+        'RADAR_BACK_LEFT', 'RADAR_BACK_RIGHT'
+    ]
+    for radar_channel in radar_channels:
+        # each radar data information
+        radar_data_token = sample['data'][radar_channel]
+        radar_sample_data = nusc.get('sample_data', radar_data_token)
+        ref_radar_time = radar_sample_data['timestamp']
+        # At each sweep, We need to merge data from 5 directions
+        for _ in range(max_sweeps):
+            radar_path = osp.join(root_path, radar_sample_data['filename'])
+            radar_sweeps.append(radar_path)
+            radar_cs_record = nusc.get(
+                'calibrated_sensor',
+                radar_sample_data['calibrated_sensor_token'])
+            radar_pose_record = nusc.get('ego_pose',
+                                         radar_sample_data['ego_pose_token'])
+            time_gap = (ref_radar_time - radar_sample_data['timestamp']) * 1e-6
+            time_gaps.append(time_gap)
+            # get radar data and do some filtering
+            current_pc = RadarPointCloud.from_file(
+                radar_path,
+                invalid_states=invalid_states,
+                dynprop_states=dynprop_states,
+                ambig_states=ambig_states
+            ).points.T  # invalid_states, dynprop_states, ambig_states
+            xyz = current_pc[:, :3]
+            rcs = current_pc[:, 5].reshape(-1, 1)
+            vxy_comp = current_pc[:, 8:10]
+            points = np.hstack((xyz, rcs, vxy_comp))
+
+            if current_pc == 'No_point':
+                continue
+            points[:, :2] += points[:, 4:6] * time_gap
+
+            #radar_point to lidar top coordinate
+            r2e_r_s = radar_cs_record['rotation']
+            r2e_t_s = radar_cs_record['translation']
+            e2g_r_s = radar_pose_record['rotation']
+            e2g_t_s = radar_pose_record['translation']
+            r2e_r_s_mat = Quaternion(r2e_r_s).rotation_matrix
+            e2g_r_s_mat = Quaternion(e2g_r_s).rotation_matrix
+
+            R = (r2e_r_s_mat.T @ e2g_r_s_mat.T) @ (
+                np.linalg.inv(e2g_r_mat).T @ np.linalg.inv(l2e_r_mat).T)
+            T = (r2e_t_s @ e2g_r_s_mat.T + e2g_t_s) @ (
+                np.linalg.inv(e2g_r_mat).T @ np.linalg.inv(l2e_r_mat).T)
+            T -= e2g_t @ (np.linalg.inv(e2g_r_mat).T @ np.linalg.inv(
+                l2e_r_mat).T) + l2e_t @ np.linalg.inv(l2e_r_mat).T
+            radar_sweeps_r2l_rot.append(R)
+            radar_sweeps_r2l_trans.append(T)
+            points[:, :3] = points[:, :3] @ R
+            points[:, 4:6] = points[:, 4:6] @ R[:2, :2]
+            points[:, :3] += T
+            all_pc = np.vstack((all_pc, points))
+
+            if radar_sample_data['prev'] == '':
+                break
+            else:
+                radar_sample_data = nusc.get('sample_data',
+                                             radar_sample_data['prev'])
+
+    info['radar_sweeps'] = radar_sweeps
+    info['radar_sweeps_time_gap'] = time_gaps
+    info['radar_sweeps_r2l_rot'] = radar_sweeps_r2l_rot
+    info['radar_sweeps_r2l_trans'] = radar_sweeps_r2l_trans
+    # info['radar_ms_pts'] = all_pc
+    # return all_pc
 
 
 def obtain_sensor2top(nusc,
